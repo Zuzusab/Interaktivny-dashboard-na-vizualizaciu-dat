@@ -1,0 +1,2 @@
+# Vizualizacny_dashboard_bakalarska_praca
+
