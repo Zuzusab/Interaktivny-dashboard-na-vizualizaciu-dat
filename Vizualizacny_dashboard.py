@@ -139,6 +139,8 @@ if subor is not None:
                     yy = st.selectbox("Os Y:", numericke if numericke else sltpce)
               with stl3:
                     zz = st.selectbox("Os Z:", numericke if numericke else sltpce)
+              if graf == "3D Line Plot":
+                max_body = st.slider("Maximálny počet bodov:", 100, 5000, 1000, step=100)
 
         if st.button(" Vygenerovať graf", type="primary", use_container_width=True):
             st.markdown(f"{graf} - {kniznica}")
@@ -155,6 +157,7 @@ if subor is not None:
                                 ax.set_zlabel(zz)
 
                           elif graf == "3D Line Plot":
+                                st.warning("3D Line Plot je vhodný len pre usporiadané dáta s menej ako 500 bodmi.")
                                 ax.plot(df[xx],df[yy], df[zz])
                                 ax.set_xlabel(xx)
                                 ax.set_ylabel(yy)
@@ -272,7 +275,7 @@ if subor is not None:
                             fig = go.Figure(data=[go.Surface(z=df[[xx, yy, zz]].values)])
                             fig.update_layout(scene=dict(xaxis_title = xx,
                                                         yaxis_title = yy,
-                                                        zaxias_title = zz))
+                                                        zaxis_title = zz))
                         st.plotly_chart(fig, use_container_width=True)
             except Exception as e:
                     st.error(f" Chyba pri generovaní grafu: {str(e)}")
