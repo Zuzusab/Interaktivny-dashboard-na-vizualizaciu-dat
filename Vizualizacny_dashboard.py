@@ -89,23 +89,23 @@ if subor is not None:
             st.caption("Pre 3D grafy vyberte Matplotlib alebo Plotly")
 
         # vyber premennych podla typu grafu
-            st.markdown("###  Nastavenie premenných")
+        st.markdown("###  Nastavenie premenných")
             
-            if graf in ["Scatter Plot", "Line Plot"]:
+        if graf in ["Scatter Plot", "Line Plot"]:
                 stl1, stl2, stl3 = st.columns(3)
                 with stl1:
                     xx = st.selectbox("X os:", numericke if numericke else sltpce)
                 with stl2:
                     yy = st.selectbox("Y os:", numericke if numericke else sltpce)
 
-            elif graf == "Bar Chart":
+        elif graf == "Bar Chart":
                 stl1, stl2 = st.columns(2)
                 with stl1:
                     xx= st.selectbox("Kategória:", kategorialne if kategorialne else sltpce)
                 with stl2:
                     yy= st.selectbox("Hodnota:", numericke if numericke else sltpce)
             
-            elif graf == "Histogram":
+        elif graf == "Histogram":
                 stl1, stl2 = st.columns(2)
                 with stl1:
                     xx= st.selectbox("Premenná:", numericke if numericke else sltpce)
@@ -113,7 +113,7 @@ if subor is not None:
                     bins = st.slider("Počet binov:", 5, 100, 30)
                 yy= None
             
-            elif graf == "Box Plot":
+        elif graf == "Box Plot":
                 stl1, stl2 = st.columns(2)
                 with stl1:
                     xx= st.selectbox("Kategória (voliteľné):", ["Žiadna"] + kategorialne)
@@ -121,98 +121,96 @@ if subor is not None:
                 with stl2:
                     yy= st.selectbox("Hodnota:", numericke if numericke else sltpce)
             
-            elif graf == "Heatmap":
+        elif graf == "Heatmap":
                 sltp = st.multiselect("Vyberte premenné:", numericke, default=numericke[:5] if len(numericke) >= 5 else numericke)
                 xx= yy = None
             
-            elif graf == "Pie Chart":
+        elif graf == "Pie Chart":
                 xx = st.selectbox("Kategória:", kategorialne if kategorialne else sltpce)
                 yy = None
 
-            if st.button(" Vygenerovať graf", type="primary", use_container_width=True):
-               st.markdown(f"{graf} - {kniznica}")
-
-               try:
-                    if kniznica == "Matplotlib":
-                        fig, ax = plt.subplots(figsize=(12, 6))
+        if st.button(" Vygenerovať graf", type="primary", use_container_width=True):
+            st.markdown(f"{graf} - {kniznica}")
+            try:
+                if kniznica == "Matplotlib":
+                    fig, ax = plt.subplots(figsize=(12, 6))
                         
-                        if graf == "Scatter Plot":
+                    if graf == "Scatter Plot":
                             ax.scatter(df[xx], df[yy], alpha=0.6)
                             ax.set_xlabel(xx)
                             ax.set_ylabel(yy)
                         
-                        elif graf == "Line Plot":
+                    elif graf == "Line Plot":
                             ax.plot(df[xx], df[yy])
                             ax.set_xlabel(xx)
                             ax.set_ylabel(yy)
                         
-                        elif graf == "Bar Chart":
+                    elif graf == "Bar Chart":
                             df.groupby(xx)[yy].mean().plot(kind='bar', ax=ax)
                             ax.set_xlabel(xx)
                             ax.set_ylabel(f"Priemer {yy}")
 
-                        elif graf == "Histogram":
+                    elif graf == "Histogram":
                             ax.hist(df[xx].dropna(), bins=bins)
                             ax.set_xlabel(xx)
                             ax.set_ylabel('')
                         
-                        elif graf == "Box Plot":
+                    elif graf == "Box Plot":
                             if xx:
                                 df.boxplot(column=yy, by=xx, ax=ax)
                             else:
                                 df[yy].plot(kind='box',ax=ax)
 
-                        elif graf == "Pie Chart":
+                    elif graf == "Pie Chart":
                             df[xx].value_counts().plot(kind='pie', ax=ax)
                             ax.set_ylabel('')
 
-                        plt.tight_layout() # automaticka oprava rozlozenia
-                        st.pyplot(fig) # bez tohoto sa graf nevykresli
+                    plt.tight_layout() # automaticka oprava rozlozenia
+                    st.pyplot(fig) # bez tohoto sa graf nevykresli
 
-                    elif kniznica == "Seaborn":
-                        fig, ax = plt.subplots(figsize=(12,6))
+                elif kniznica == "Seaborn":
+                    fig, ax = plt.subplots(figsize=(12,6))
 
-                        if graf == "Scatter Plot":
+                    if graf == "Scatter Plot":
                             sns.scatterplot(df=df, x=xx, y=yy, ax=ax)
 
-                        elif graf == "Line Plot":
+                    elif graf == "Line Plot":
                             sns.lineplot(df=df,x=xx, y=yy, ax=ax)
                         
-                        elif graf == "Bar Chart":
+                    elif graf == "Bar Chart":
                             sns.barplot(df=df, x=xx, y=yy, ax=ax)
 
-                        elif graf == "Histogram":
+                    elif graf == "Histogram":
                             sns.histplot(df=df, x=xx, bins=bins, ax=ax)
                         
-                        elif graf == "Box Plot":
+                    elif graf == "Box Plot":
                             sns.boxplot(df=df, x=xx, y=yy, ax=ax)
 
-                        elif graf =="Heatmap":
+                    elif graf =="Heatmap":
                             if sltp:
                                 corr = df[sltp].corr()
                                 sns.heatmap(corr, annot=True, center=0, ax=ax)
 
-                        plt.tight_layout() # automaticka oprava rozlozenia
-                        st.pyplot(fig) # bez tohoto sa graf nevykresli
+                    plt.tight_layout() # automaticka oprava rozlozenia
+                    st.pyplot(fig) # bez tohoto sa graf nevykresli
 
-                    elif kniznica == "Plotly":
-                        if graf == "Scatter Plot":
-                            fig = px.scatter(df, x=xx, y=yy)
+                elif kniznica == "Plotly":
+                    if graf == "Scatter Plot":
+                        fig = px.scatter(df, x=xx, y=yy)
                         
-                        elif graf == "Line Plot":
-                            fig = px.line(df, x=xx, y=yy)
+                    elif graf == "Line Plot":
+                        fig = px.line(df, x=xx, y=yy)
 
-                        elif graf == "Bar Chart":
-                            fig = px.bar(df, x=xx, y=yy)
+                    elif graf == "Bar Chart":
+                        fig = px.bar(df, x=xx, y=yy)
 
-                        elif graf == "Histogram":
-                            fig = px.histogram(df, x=xx, y=yy, nbins=bins)
+                    elif graf == "Histogram":
+                        fig = px.histogram(df, x=xx, y=yy, nbins=bins)
                         
-                        elif graf == "Box Plot":
-                            fig = px.box(df, x=xx, y=yy)
+                    elif graf == "Box Plot":
+                        fig = px.box(df, x=xx, y=yy)
 
-                            
-               except Exception as e:
+            except Exception as e:
                     st.error(f" Chyba pri generovaní grafu: {str(e)}")
     except Exception as e:
                     st.error(f" Chyba pri generovaní grafu: {str(e)}")
