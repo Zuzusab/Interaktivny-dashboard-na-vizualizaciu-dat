@@ -7,6 +7,8 @@ import plotly.express as px
 import plotly.graph_objects as go
 from bokeh.plotting import figure
 from bokeh.models import HoverTool
+from mpl_toolkits.mplot3d import Axes3D
+from scipy.interpolate import griddata
 import altair as alt
 import io
 
@@ -128,88 +130,150 @@ if subor is not None:
         elif graf == "Pie Chart":
                 xx = st.selectbox("Kategória:", kategorialne if kategorialne else sltpce)
                 yy = None
+        
+        elif graf in ["3D Scatter Plot", "3D Surface Plot", "3D Line Plot"]:
+              stl1, stl2, stl3 = st.columns(3)
+              with stl1:
+                    xx = st.selectbox("Os X:", numericke if numericke else sltpce)
+              with stl2:
+                    yy = st.selectbox("Os Y:", numericke if numericke else sltpce)
+              with stl3:
+                    zz = st.selectbox("Os Z:", numericke if numericke else sltpce)
 
         if st.button(" Vygenerovať graf", type="primary", use_container_width=True):
             st.markdown(f"{graf} - {kniznica}")
             try:
                 if kniznica == "Matplotlib":
-                    fig, ax = plt.subplots(figsize=(12, 6))
-                        
-                    if graf == "Scatter Plot":
-                            ax.scatter(df[xx], df[yy], alpha=0.6)
-                            ax.set_xlabel(xx)
-                            ax.set_ylabel(yy)
-                        
-                    elif graf == "Line Plot":
-                            ax.plot(df[xx], df[yy])
-                            ax.set_xlabel(xx)
-                            ax.set_ylabel(yy)
-                        
-                    elif graf == "Bar Chart":
-                            df.groupby(xx)[yy].mean().plot(kind='bar', ax=ax)
-                            ax.set_xlabel(xx)
-                            ax.set_ylabel(f"Priemer {yy}")
+                    if graf in ["3D Scatter Plot", "3D Line Plot", "3D Surface Plot"]:
+                          fig = plt.figure(figsize=(12,8))
+                          ax = fig.add_subplot(111, projection = '3d')
+                          
+                          if graf == "3D Scatter Plot":
+                                ax.scatter(df[xx], df[yy], df[zz])
+                                ax.set_xlabel(xx)
+                                ax.set_ylabel(yy)
+                                ax.set_zlabel(zz)
 
-                    elif graf == "Histogram":
-                            ax.hist(df[xx].dropna(), bins=bins)
-                            ax.set_xlabel(xx)
-                            ax.set_ylabel('')
-                        
-                    elif graf == "Box Plot":
-                            if xx:
-                                df.boxplot(column=yy, by=xx, ax=ax)
-                            else:
-                                df[yy].plot(kind='box',ax=ax)
+                          elif graf == "3D Line Plot":
+                                ax.plot(df[xx],df[yy], df[zz])
+                                ax.set_xlabel(xx)
+                                ax.set_ylabel(yy)
+                                ax.set_zlabel(zz)
 
-                    elif graf == "Pie Chart":
-                            df[xx].value_counts().plot(kind='pie', ax=ax)
-                            ax.set_ylabel('')
+                          elif graf == "3D Surface Plot":
+                                data_clean = df[[xx, yy, zz]].dropna()
+                                xi = np.linspace(data_clean[xx].min(), data_clean[xx].max(), 50)
+                                yi = np.linspace(data_clean[yy].min(), data_clean[yy].max(), 50)
+                                XI, YI = np.meshgrid(xi, yi)
+                                ZI = griddata((data_clean[xx], data_clean[yy]), data_clean[zz], (XI, YI), method='cubic')
+                                
+                                surf = ax.plot_surface(XI, YI, ZI, cmap='viridis', alpha=0.8)
+                                fig.colorbar(surf, ax=ax, shrink=0.5)
+                                ax.set_xlabel(xx)
+                                ax.set_ylabel(yy)
+                                ax.set_zlabel(zz)
+                          plt.tight_layout() # automaticka oprava rozlozenia
+                          st.pyplot(fig) # bez tohoto sa graf nevykresli
+                    else:                
+                        fig, ax = plt.subplots(figsize=(12, 6))
+                            
+                        if graf == "Scatter Plot":
+                                ax.scatter(df[xx], df[yy], alpha=0.6)
+                                ax.set_xlabel(xx)
+                                ax.set_ylabel(yy)
+                            
+                        elif graf == "Line Plot":
+                                ax.plot(df[xx], df[yy])
+                                ax.set_xlabel(xx)
+                                ax.set_ylabel(yy)
+                            
+                        elif graf == "Bar Chart":
+                                df.groupby(xx)[yy].mean().plot(kind='bar', ax=ax)
+                                ax.set_xlabel(xx)
+                                ax.set_ylabel(f"Priemer {yy}")
 
-                    plt.tight_layout() # automaticka oprava rozlozenia
-                    st.pyplot(fig) # bez tohoto sa graf nevykresli
+                        elif graf == "Histogram":
+                                ax.hist(df[xx].dropna(), bins=bins)
+                                ax.set_xlabel(xx)
+                                ax.set_ylabel('')
+                            
+                        elif graf == "Box Plot":
+                                if xx:
+                                    df.boxplot(column=yy, by=xx, ax=ax)
+                                else:
+                                    df[yy].plot(kind='box',ax=ax)
+
+                        elif graf == "Pie Chart":
+                                df[xx].value_counts().plot(kind='pie', ax=ax)
+                                ax.set_ylabel('')
+
+                        plt.tight_layout() # automaticka oprava rozlozenia
+                        st.pyplot(fig) # bez tohoto sa graf nevykresli
 
                 elif kniznica == "Seaborn":
-                    fig, ax = plt.subplots(figsize=(12,6))
+                        fig, ax = plt.subplots(figsize=(12,6))
 
-                    if graf == "Scatter Plot":
-                            sns.scatterplot(df=df, x=xx, y=yy, ax=ax)
+                        if graf == "Scatter Plot":
+                                sns.scatterplot(df=df, x=xx, y=yy, ax=ax)
 
-                    elif graf == "Line Plot":
-                            sns.lineplot(df=df,x=xx, y=yy, ax=ax)
-                        
-                    elif graf == "Bar Chart":
-                            sns.barplot(df=df, x=xx, y=yy, ax=ax)
+                        elif graf == "Line Plot":
+                                sns.lineplot(df=df,x=xx, y=yy, ax=ax)
+                            
+                        elif graf == "Bar Chart":
+                                sns.barplot(df=df, x=xx, y=yy, ax=ax)
 
-                    elif graf == "Histogram":
-                            sns.histplot(df=df, x=xx, bins=bins, ax=ax)
-                        
-                    elif graf == "Box Plot":
-                            sns.boxplot(df=df, x=xx, y=yy, ax=ax)
+                        elif graf == "Histogram":
+                                sns.histplot(df=df, x=xx, bins=bins, ax=ax)
+                            
+                        elif graf == "Box Plot":
+                                sns.boxplot(df=df, x=xx, y=yy, ax=ax)
 
-                    elif graf =="Heatmap":
-                            if sltp:
-                                corr = df[sltp].corr()
-                                sns.heatmap(corr, annot=True, center=0, ax=ax)
+                        elif graf =="Heatmap":
+                                if sltp:
+                                    corr = df[sltp].corr()
+                                    sns.heatmap(corr, annot=True, center=0, ax=ax)
 
-                    plt.tight_layout() # automaticka oprava rozlozenia
-                    st.pyplot(fig) # bez tohoto sa graf nevykresli
+                        plt.tight_layout() # automaticka oprava rozlozenia
+                        st.pyplot(fig) # bez tohoto sa graf nevykresli
 
                 elif kniznica == "Plotly":
-                    if graf == "Scatter Plot":
-                        fig = px.scatter(df, x=xx, y=yy)
+                        if graf == "Scatter Plot":
+                            fig = px.scatter(df, x=xx, y=yy)
+                            
+                        elif graf == "Line Plot":
+                            fig = px.line(df, x=xx, y=yy)
+
+                        elif graf == "Bar Chart":
+                            fig = px.bar(df, x=xx, y=yy)
+
+                        elif graf == "Histogram":
+                            fig = px.histogram(df, x=xx, y=yy, nbins=bins)
+                            
+                        elif graf == "Box Plot":
+                            fig = px.box(df, x=xx, y=yy)
                         
-                    elif graf == "Line Plot":
-                        fig = px.line(df, x=xx, y=yy)
-
-                    elif graf == "Bar Chart":
-                        fig = px.bar(df, x=xx, y=yy)
-
-                    elif graf == "Histogram":
-                        fig = px.histogram(df, x=xx, y=yy, nbins=bins)
+                        elif graf == "Heatmap":
+                            if sltp:
+                                    corr = df[sltp].corr()
+                                    fig = px.imshow(corr, aspect = "auto")
                         
-                    elif graf == "Box Plot":
-                        fig = px.box(df, x=xx, y=yy)
+                        elif graf == "Pie Chart":
+                            hodnoty = df[xx].value_counts()
+                            fig = px.pie(values=hodnoty.values, names = hodnoty.index)
+                        
+                        # 3D Grafy
+                        elif graf == "3D Scatter Plot":
+                            fig = px.scatter_3d(df, x=xx, y=yy, z=zz)
+                        
+                        elif graf == "3D Line Plot":
+                            fig = px.line_3d(df, x=xx, y=yy, z=zz)
 
+                        elif graf == "3D Surface Plot":
+                            fig = go.Figure(data=[go.Surface(z=df[[xx, yy, zz]].values)])
+                            fig.update_layout(scene=dict(xaxis_title = xx,
+                                                        yaxis_title = yy,
+                                                        zaxias_title = zz))
+                        st.plotly_chart(fig, use_container_width=True)
             except Exception as e:
                     st.error(f" Chyba pri generovaní grafu: {str(e)}")
     except Exception as e:
