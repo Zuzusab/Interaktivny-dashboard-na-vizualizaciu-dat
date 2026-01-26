@@ -73,15 +73,19 @@ if subor is not None:
                 
             if kniznica == "Seaborn":
                 dostupne_grafy = [g for g in grafy_2d if g != "Pie Chart"]
+
             elif kniznica == "Matplotlib":
                 dostupne_grafy = [g for g in grafy_2d if g != "Heatmap"] + grafy_3d
+
             elif kniznica == "Plotly":
                 dostupne_grafy = grafy_2d + grafy_3d
+
             elif kniznica == "Bokeh":
                 dostupne_grafy = [g for g in grafy_2d if g not in ["Pie Chart", "Heatmap", "Box Plot"]]
-            else:
-                dostupne_grafy = grafy_2d
-            
+
+            elif kniznica == "Altair":
+                dostupne_grafy = [g for g in grafy_2d if g not in ["Pie Chart", "Heatmap"]]
+
             graf = st.selectbox(" Vyberte typ grafu:", dostupne_grafy)
             
             if kniznica not in ["Matplotlib", "Plotly"]:
@@ -327,9 +331,39 @@ if subor is not None:
                         {script}
                         {div}
                         """, height=500)
+                    elif kniznica == "Altair":
+                        if graf == "Scatter Plot":
+                            fig = alt.Chart(df).mark_circle(size=60).encode(
+                                x=xx, y=yy, tooltip=[xx,yy]
+                            ).interactive()
+
+                        elif graf == "Line Plot":
+                            fig = alt.Chart(df).mark_line().encode(
+                                x=xx, y=yy, tooltip=[xx,yy]
+                            ).interactive()
+
+                        elif graf == "Bar Chart":
+                            fig = alt.Chart(df).mark_bar().encode(
+                                x=xx, y=f'mean({yy})', tooltip=[xx,f'mean({yy})']
+                            ).interactive()
+                        
+                        elif graf == "Histogram":
+                            fig=alt.Chart(df).mark_bar().encode(
+                                alt.X(f'{xx}:Q', bin=alt.Bin(maxbins=bins)), #na os x ide numerická premenná
+                                y='count()',   
+                            ).interactive()
+                        
+                        elif graf == "Box Plot":
+                            fig = alt.Chart(df).mark_boxplot().encode(
+                                x=f'{xx}:N' if xx else alt.value(0), #použije sa ako kategória (:N = nominal) na osi X alebo všetky hodnoty budú v jednom boxe (na pozícii 0)
+                                y=f'{yy}:Q'
+                            )
+                        fig = fig.properties(width=800, height=400)
+                        st.altair_chart(fig, use_container_width=True)
 
                 except Exception as e:
                     st.error(f" Chyba pri generovaní grafu: {str(e)}")
-                    
+            else:  # Porovnávací režim
+                st.markdown("### Porovnanie vizualizačných knižníc")       
     except Exception as e:
         st.error(f" Chyba pri načítaní súboru: {str(e)}")
