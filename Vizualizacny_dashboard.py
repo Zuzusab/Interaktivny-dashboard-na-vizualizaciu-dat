@@ -257,7 +257,9 @@ if subor is not None:
                             fig = px.scatter(df, x=xx, y=yy)
                             
                         elif graf == "Line Plot":
-                            fig = px.line(df, x=xx, y=yy)
+                            # agregacia dat - priemer pre kazdu hodnotu na X osi
+                            df_agg = df.groupby(xx)[yy].mean().reset_index().sort_values(by=xx)
+                            fig = px.line(df_agg, x=xx, y=yy, markers=True)
 
                         elif graf == "Bar Chart":
                             fig = px.bar(df, x=xx, y=yy)
@@ -282,13 +284,35 @@ if subor is not None:
                             fig = px.scatter_3d(df, x=xx, y=yy, z=zz)
                         
                         elif graf == "3D Line Plot":
-                            fig = px.line_3d(df, x=xx, y=yy, z=zz)
+                            if zz:
+                                df_sorted = df.sort_values(by=xx)
+                                fig = go.Figure(data=[go.Scatter3d(
+                                    x=df_sorted[xx], 
+                                    y=df_sorted[yy], 
+                                    z=df_sorted[zz],
+                                    mode='lines+markers',
+                                    marker=dict(size=4),
+                                    line=dict(width=2)
+                                )])
+                                fig.update_layout(title=f"3D Line Plot", scene=dict(xaxis_title=xx, yaxis_title=yy, zaxis_title=zz))
+                            else:
+                                st.warning("Pre 3D Line Plot musíte vybrať Z os!")
 
                         elif graf == "3D Surface Plot":
-                            fig = go.Figure(data=[go.Surface(z=df[[xx, yy, zz]].values)])
-                            fig.update_layout(scene=dict(xaxis_title = xx,
-                                                        yaxis_title = yy,
-                                                        zaxis_title = zz))
+                            if zz:
+                                # vytvorenie grid struktury pre surface plot
+                                df_pivot = df.pivot_table(values=zz, index=yy, columns=xx, aggfunc='mean')
+                                fig = go.Figure(data=[go.Surface(
+                                    x=df_pivot.columns,
+                                    y=df_pivot.index,
+                                    z=df_pivot.values
+                                )])
+                                fig.update_layout(
+                                    title=f"3D Surface Plot",
+                                    scene=dict(xaxis_title=xx, yaxis_title=yy, zaxis_title=zz)
+                                )
+                            else:
+                                st.warning("Pre 3D Surface Plot musíte vybrať Z os!")
                         st.plotly_chart(fig, use_container_width=True)
             except Exception as e:
                     st.error(f" Chyba pri generovaní grafu: {str(e)}")
