@@ -6,7 +6,8 @@ import seaborn as sns
 import plotly.express as px
 import plotly.graph_objects as go
 from bokeh.plotting import figure
-from bokeh.models import HoverTool
+from bokeh.embed import components
+import streamlit.components.v1 as components_st
 from mpl_toolkits.mplot3d import Axes3D
 from scipy.interpolate import griddata
 import altair as alt
@@ -28,10 +29,9 @@ st.header(":violet[Interaktívny Vizualizačný Dashboard]")
 subor = st.file_uploader(" Nahrajte dataset (CSV, Excel)",type=['csv', 'xlsx', 'xls'], help="Podporované formáty: CSV, Excel")
 
 if subor is not None:
-    # nacitanie suboru
     try:
         if subor.name.endswith('.csv'):
-            df = pd.read_csv(subor, sep=None, engine='python') # dokaze spracovat aj nespravne naformatovane csv
+            df = pd.read_csv(subor, sep=None, engine='python')
         else:
             df = pd.read_excel(subor)
 
@@ -44,16 +44,14 @@ if subor is not None:
             st.metric("Numerické stĺpce", len(df.select_dtypes(include=['number']).columns))
         with stl4:
             st.metric("Kategoriálne stĺpce", len(df.select_dtypes(include=['object']).columns))
-        # zobrazenie hlavicky datasetu
+        
         with st.expander("Zobraziť dataset"):
              st.write(df.head(10))
 
-        # ziskanie stlpcov
         numericke= df.select_dtypes(include=['number']).columns.tolist()
         kategorialne = df.select_dtypes(include=['object']).columns.tolist()
         sltpce = df.columns.tolist()
 
-        # vyber rezimu
         mode = st.radio(
             " Vyberte režim vizualizácie:",
             ["Štandardný režim", "Porovnávací režim"],
@@ -62,61 +60,50 @@ if subor is not None:
         if mode == "Štandardný režim":
             stl1, stl2 = st.columns(2)
     
-        with stl1:
-            kniznica = st.selectbox(
-                " Vyberte vizualizačnú knižnicu:",
-                ["Matplotlib", "Seaborn", "Plotly", "Bokeh", "Altair"]
-            )
-    
-        with stl2:
-            # zakladne 2D grafy
-            grafy_2d = ["Scatter Plot", "Line Plot", "Bar Chart", "Histogram", 
-                        "Box Plot", "Heatmap", "Pie Chart"]
-            
-            # 3D grafy len pre Matplotlib a Plotly
-            grafy_3d = ["3D Scatter Plot", "3D Surface Plot", "3D Line Plot"]
-            
-        if kniznica == "Seaborn":
-            # Seaborn nepodporuje Pie Chart
-            dostupne_grafy = [g for g in grafy_2d if g != "Pie Chart"]
-
-        elif kniznica == "Matplotlib":
-            # Matplotlib nepodporuje Heatmap
-            dostupne_grafy = [g for g in grafy_2d if g != "Heatmap"]+ grafy_3d
-
-        elif kniznica == "Plotly":
-            dostupne_grafy = grafy_2d + grafy_3d
-
-        else:
-            dostupne_grafy = grafy_2d
+            with stl1:
+                kniznica = st.selectbox(
+                    " Vyberte vizualizačnú knižnicu:",
+                    ["Matplotlib", "Seaborn", "Plotly", "Bokeh", "Altair"]
+                )
         
-        graf = st.selectbox(
-            " Vyberte typ grafu:",
-            dostupne_grafy
-        )
-        
-        # info pre pouzivatela
-        if kniznica not in ["Matplotlib", "Plotly"]:
-            st.caption("Pre 3D grafy vyberte Matplotlib alebo Plotly")
-
-        # vyber premennych podla typu grafu
-        st.markdown("###  Nastavenie premenných")
+            with stl2:
+                grafy_2d = ["Scatter Plot", "Line Plot", "Bar Chart", "Histogram", 
+                            "Box Plot", "Heatmap", "Pie Chart"]
+                grafy_3d = ["3D Scatter Plot", "3D Surface Plot", "3D Line Plot"]
+                
+            if kniznica == "Seaborn":
+                dostupne_grafy = [g for g in grafy_2d if g != "Pie Chart"]
+            elif kniznica == "Matplotlib":
+                dostupne_grafy = [g for g in grafy_2d if g != "Heatmap"] + grafy_3d
+            elif kniznica == "Plotly":
+                dostupne_grafy = grafy_2d + grafy_3d
+            elif kniznica == "Bokeh":
+                dostupne_grafy = [g for g in grafy_2d if g not in ["Pie Chart", "Heatmap", "Box Plot"]]
+            else:
+                dostupne_grafy = grafy_2d
             
-        if graf in ["Scatter Plot", "Line Plot"]:
-                stl1, stl2, stl3 = st.columns(3)
+            graf = st.selectbox(" Vyberte typ grafu:", dostupne_grafy)
+            
+            if kniznica not in ["Matplotlib", "Plotly"]:
+                st.caption("Pre 3D grafy vyberte Matplotlib alebo Plotly")
+
+            st.markdown("###  Nastavenie premenných")
+                
+            if graf in ["Scatter Plot", "Line Plot"]:
+                stl1, stl2 = st.columns(2)
                 with stl1:
                     xx = st.selectbox("X os:", numericke if numericke else sltpce)
                 with stl2:
                     yy = st.selectbox("Y os:", numericke if numericke else sltpce)
 
-        elif graf == "Bar Chart":
+            elif graf == "Bar Chart":
                 stl1, stl2 = st.columns(2)
                 with stl1:
                     xx= st.selectbox("Kategória:", kategorialne if kategorialne else sltpce)
                 with stl2:
                     yy= st.selectbox("Hodnota:", numericke if numericke else sltpce)
             
-        elif graf == "Histogram":
+            elif graf == "Histogram":
                 stl1, stl2 = st.columns(2)
                 with stl1:
                     xx= st.selectbox("Premenná:", numericke if numericke else sltpce)
@@ -124,7 +111,7 @@ if subor is not None:
                     bins = st.slider("Počet binov:", 5, 100, 30)
                 yy= None
             
-        elif graf == "Box Plot":
+            elif graf == "Box Plot":
                 stl1, stl2 = st.columns(2)
                 with stl1:
                     xx= st.selectbox("Kategória (voliteľné):", ["Žiadna"] + kategorialne)
@@ -132,47 +119,47 @@ if subor is not None:
                 with stl2:
                     yy= st.selectbox("Hodnota:", numericke if numericke else sltpce)
             
-        elif graf == "Heatmap":
+            elif graf == "Heatmap":
                 sltp = st.multiselect("Vyberte premenné:", numericke, default=numericke[:5] if len(numericke) >= 5 else numericke)
                 xx= yy = None
             
-        elif graf == "Pie Chart":
+            elif graf == "Pie Chart":
                 xx = st.selectbox("Kategória:", kategorialne if kategorialne else sltpce)
                 yy = None
-        
-        elif graf in ["3D Scatter Plot", "3D Surface Plot", "3D Line Plot"]:
-              stl1, stl2, stl3 = st.columns(3)
-              with stl1:
+            
+            elif graf in ["3D Scatter Plot", "3D Surface Plot", "3D Line Plot"]:
+                stl1, stl2, stl3 = st.columns(3)
+                with stl1:
                     xx = st.selectbox("Os X:", numericke if numericke else sltpce)
-              with stl2:
+                with stl2:
                     yy = st.selectbox("Os Y:", numericke if numericke else sltpce)
-              with stl3:
+                with stl3:
                     zz = st.selectbox("Os Z:", numericke if numericke else sltpce)
-              if graf == "3D Line Plot":
-                max_body = st.slider("Maximálny počet bodov:", 100, 5000, 1000, step=100)
+                if graf == "3D Line Plot":
+                    max_body = st.slider("Maximálny počet bodov:", 100, 5000, 1000, step=100)
 
-        if st.button(" Vygenerovať graf", type="primary", use_container_width=True):
-            st.markdown(f"{graf} - {kniznica}")
-            try:
-                if kniznica == "Matplotlib":
-                    if graf in ["3D Scatter Plot", "3D Line Plot", "3D Surface Plot"]:
-                          fig = plt.figure(figsize=(12,8))
-                          ax = fig.add_subplot(111, projection = '3d')
-                          
-                          if graf == "3D Scatter Plot":
+            if st.button(" Vygenerovať graf", type="primary", use_container_width=True):
+                st.markdown(f"{graf} - {kniznica}")
+                try:
+                    if kniznica == "Matplotlib":
+                        if graf in ["3D Scatter Plot", "3D Line Plot", "3D Surface Plot"]:
+                            fig = plt.figure(figsize=(12,8))
+                            ax = fig.add_subplot(111, projection = '3d')
+                            
+                            if graf == "3D Scatter Plot":
                                 ax.scatter(df[xx], df[yy], df[zz])
                                 ax.set_xlabel(xx)
                                 ax.set_ylabel(yy)
                                 ax.set_zlabel(zz)
 
-                          elif graf == "3D Line Plot":
+                            elif graf == "3D Line Plot":
                                 st.warning("3D Line Plot je vhodný len pre usporiadané dáta s menej ako 500 bodmi.")
                                 ax.plot(df[xx],df[yy], df[zz])
                                 ax.set_xlabel(xx)
                                 ax.set_ylabel(yy)
                                 ax.set_zlabel(zz)
 
-                          elif graf == "3D Surface Plot":
+                            elif graf == "3D Surface Plot":
                                 data_clean = df[[xx, yy, zz]].dropna()
                                 xi = np.linspace(data_clean[xx].min(), data_clean[xx].max(), 50)
                                 yi = np.linspace(data_clean[yy].min(), data_clean[yy].max(), 50)
@@ -184,80 +171,77 @@ if subor is not None:
                                 ax.set_xlabel(xx)
                                 ax.set_ylabel(yy)
                                 ax.set_zlabel(zz)
-                          plt.tight_layout() # automaticka oprava rozlozenia
-                          st.pyplot(fig) # bez tohoto sa graf nevykresli
-                    else:                
-                        fig, ax = plt.subplots(figsize=(12, 6))
-                            
-                        if graf == "Scatter Plot":
+                            plt.tight_layout()
+                            st.pyplot(fig)
+                        else:                
+                            fig, ax = plt.subplots(figsize=(12, 6))
+                                
+                            if graf == "Scatter Plot":
                                 ax.scatter(df[xx], df[yy], alpha=0.6)
                                 ax.set_xlabel(xx)
                                 ax.set_ylabel(yy)
                             
-                        elif graf == "Line Plot":
-                                # agregacia dat - priemer pre kazdu hodnotu na X osi
+                            elif graf == "Line Plot":
                                 df_agg = df.groupby(xx)[yy].mean().reset_index().sort_values(by=xx)
                                 ax.plot(df_agg[xx], df_agg[yy])
                                 ax.set_xlabel(xx)
                                 ax.set_ylabel(yy)
                             
-                        elif graf == "Bar Chart":
+                            elif graf == "Bar Chart":
                                 df.groupby(xx)[yy].mean().plot(kind='bar', ax=ax)
                                 ax.set_xlabel(xx)
                                 ax.set_ylabel(f"Priemer {yy}")
 
-                        elif graf == "Histogram":
+                            elif graf == "Histogram":
                                 ax.hist(df[xx].dropna(), bins=bins)
                                 ax.set_xlabel(xx)
                                 ax.set_ylabel('')
                             
-                        elif graf == "Box Plot":
+                            elif graf == "Box Plot":
                                 if xx:
                                     df.boxplot(column=yy, by=xx, ax=ax)
                                 else:
                                     df[yy].plot(kind='box',ax=ax)
 
-                        elif graf == "Pie Chart":
+                            elif graf == "Pie Chart":
                                 df[xx].value_counts().plot(kind='pie', ax=ax)
                                 ax.set_ylabel('')
 
-                        plt.tight_layout() # automaticka oprava rozlozenia
-                        st.pyplot(fig) # bez tohoto sa graf nevykresli
+                            plt.tight_layout()
+                            st.pyplot(fig)
 
-                elif kniznica == "Seaborn":
+                    elif kniznica == "Seaborn":
                         fig, ax = plt.subplots(figsize=(12,6))
 
                         if graf == "Scatter Plot":
-                                sns.scatterplot(data=df, x=xx, y=yy, ax=ax)
+                            sns.scatterplot(data=df, x=xx, y=yy, ax=ax)
 
                         elif graf == "Line Plot":
-                                # agregacia dat - priemer pre kazdu hodnotu na X osi
-                                df_agg = df.groupby(xx)[yy].mean().reset_index().sort_values(by=xx)
-                                sns.lineplot(data=df_agg, x=xx, y=yy, ax=ax)
-                            
+                            df_agg = df.groupby(xx)[yy].mean().reset_index().sort_values(by=xx)
+                            sns.lineplot(data=df_agg, x=xx, y=yy, ax=ax)
+                        
                         elif graf == "Bar Chart":
-                                sns.barplot(data=df, x=xx, y=yy, ax=ax)
+                            sns.barplot(data=df, x=xx, y=yy, ax=ax)
 
                         elif graf == "Histogram":
-                                sns.histplot(data=df, x=xx, bins=bins, ax=ax)
-                            
+                            sns.histplot(data=df, x=xx, bins=bins, ax=ax)
+                        
                         elif graf == "Box Plot":
-                                sns.boxplot(data=df, x=xx, y=yy, ax=ax)
+                            sns.boxplot(data=df, x=xx, y=yy, ax=ax)
 
                         elif graf =="Heatmap":
-                                if sltp:
-                                    corr = df[sltp].corr()
-                                    sns.heatmap(corr, annot=True, center=0, ax=ax)
+                            if sltp:
+                                corr = df[sltp].corr()
+                                sns.heatmap(corr, annot=True, center=0, ax=ax)
 
-                        plt.tight_layout() # automaticka oprava rozlozenia
-                        st.pyplot(fig) # bez tohoto sa graf nevykresli
+                        plt.tight_layout()
+                        st.pyplot(fig)
 
-                elif kniznica == "Plotly":
+                    elif kniznica == "Plotly":
                         if graf == "Scatter Plot":
                             fig = px.scatter(df, x=xx, y=yy)
-                            
+                        
                         elif graf == "Line Plot":
-                            # agregacia dat - priemer pre kazdu hodnotu na X osi
                             df_agg = df.groupby(xx)[yy].mean().reset_index().sort_values(by=xx)
                             fig = px.line(df_agg, x=xx, y=yy, markers=True)
 
@@ -266,20 +250,19 @@ if subor is not None:
 
                         elif graf == "Histogram":
                             fig = px.histogram(df, x=xx, y=yy, nbins=bins)
-                            
+                        
                         elif graf == "Box Plot":
                             fig = px.box(df, x=xx, y=yy)
                         
                         elif graf == "Heatmap":
                             if sltp:
-                                    corr = df[sltp].corr()
-                                    fig = px.imshow(corr, aspect = "auto")
+                                corr = df[sltp].corr()
+                                fig = px.imshow(corr, aspect = "auto")
                         
                         elif graf == "Pie Chart":
                             hodnoty = df[xx].value_counts()
                             fig = px.pie(values=hodnoty.values, names = hodnoty.index)
                         
-                        # 3D Grafy
                         elif graf == "3D Scatter Plot":
                             fig = px.scatter_3d(df, x=xx, y=yy, z=zz)
                         
@@ -300,7 +283,6 @@ if subor is not None:
 
                         elif graf == "3D Surface Plot":
                             if zz:
-                                # vytvorenie grid struktury pre surface plot
                                 df_pivot = df.pivot_table(values=zz, index=yy, columns=xx, aggfunc='mean')
                                 fig = go.Figure(data=[go.Surface(
                                     x=df_pivot.columns,
@@ -314,8 +296,40 @@ if subor is not None:
                             else:
                                 st.warning("Pre 3D Surface Plot musíte vybrať Z os!")
                         st.plotly_chart(fig, use_container_width=True)
-            except Exception as e:
+
+                    elif kniznica == "Bokeh":
+                        fig = figure(width=800, height=400, title=graf)
+                        
+                        if graf == "Scatter Plot":
+                            fig.scatter(df[xx].values, df[yy].values, size=8, alpha=0.6)
+                        
+                        elif graf == "Line Plot":
+                            df_sorted = df.sort_values(by=xx)
+                            fig.line(df_sorted[xx].values, df_sorted[yy].values, line_width=2)
+                        
+                        elif graf == "Bar Chart":
+                            grouped = df.groupby(xx)[yy].mean()
+                            fig.vbar(x=list(range(len(grouped))), top=grouped.values, width=0.8)
+                            fig.xaxis.ticker = list(range(len(grouped)))
+
+                        elif graf == "Histogram":
+                            hist, edges = np.histogram(df[xx].dropna(), bins=bins)
+                            fig.quad(top=hist, bottom=0, left=edges[:-1], right=edges[1:], alpha=0.7)
+                        
+                        fig.xaxis.axis_label = xx if xx else ""
+                        fig.yaxis.axis_label = yy if yy else ""
+                        
+                        # použitie HTML komponentu pre vykreslenie Bokeh grafu preto6e Streamlit prestal plne podporovat Bokeh
+                        script, div = components(fig)
+                        components_st.html(f"""
+                        <link rel="stylesheet" href="https://cdn.bokeh.org/bokeh/release/bokeh-2.4.3.min.css">
+                        <script src="https://cdn.bokeh.org/bokeh/release/bokeh-2.4.3.min.js"></script>
+                        {script}
+                        {div}
+                        """, height=500)
+
+                except Exception as e:
                     st.error(f" Chyba pri generovaní grafu: {str(e)}")
+                    
     except Exception as e:
-                    st.error(f" Chyba pri generovaní grafu: {str(e)}")
-        
+        st.error(f" Chyba pri načítaní súboru: {str(e)}")
