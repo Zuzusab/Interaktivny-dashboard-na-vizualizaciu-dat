@@ -76,8 +76,17 @@ if subor is not None:
             # 3D grafy len pre Matplotlib a Plotly
             grafy_3d = ["3D Scatter Plot", "3D Surface Plot", "3D Line Plot"]
             
-        if kniznica in ["Matplotlib", "Plotly"]:
+        if kniznica == "Seaborn":
+            # Seaborn nepodporuje Pie Chart
+            dostupne_grafy = [g for g in grafy_2d if g != "Pie Chart"]
+
+        elif kniznica == "Matplotlib":
+            # Matplotlib nepodporuje Heatmap
+            dostupne_grafy = [g for g in grafy_2d if g != "Heatmap"]+ grafy_3d
+
+        elif kniznica == "Plotly":
             dostupne_grafy = grafy_2d + grafy_3d
+
         else:
             dostupne_grafy = grafy_2d
         
@@ -186,7 +195,9 @@ if subor is not None:
                                 ax.set_ylabel(yy)
                             
                         elif graf == "Line Plot":
-                                ax.plot(df[xx], df[yy])
+                                # agregacia dat - priemer pre kazdu hodnotu na X osi
+                                df_agg = df.groupby(xx)[yy].mean().reset_index().sort_values(by=xx)
+                                ax.plot(df_agg[xx], df_agg[yy])
                                 ax.set_xlabel(xx)
                                 ax.set_ylabel(yy)
                             
@@ -217,19 +228,21 @@ if subor is not None:
                         fig, ax = plt.subplots(figsize=(12,6))
 
                         if graf == "Scatter Plot":
-                                sns.scatterplot(df=df, x=xx, y=yy, ax=ax)
+                                sns.scatterplot(data=df, x=xx, y=yy, ax=ax)
 
                         elif graf == "Line Plot":
-                                sns.lineplot(df=df,x=xx, y=yy, ax=ax)
+                                # agregacia dat - priemer pre kazdu hodnotu na X osi
+                                df_agg = df.groupby(xx)[yy].mean().reset_index().sort_values(by=xx)
+                                sns.lineplot(data=df_agg, x=xx, y=yy, ax=ax)
                             
                         elif graf == "Bar Chart":
-                                sns.barplot(df=df, x=xx, y=yy, ax=ax)
+                                sns.barplot(data=df, x=xx, y=yy, ax=ax)
 
                         elif graf == "Histogram":
-                                sns.histplot(df=df, x=xx, bins=bins, ax=ax)
+                                sns.histplot(data=df, x=xx, bins=bins, ax=ax)
                             
                         elif graf == "Box Plot":
-                                sns.boxplot(df=df, x=xx, y=yy, ax=ax)
+                                sns.boxplot(data=df, x=xx, y=yy, ax=ax)
 
                         elif graf =="Heatmap":
                                 if sltp:
