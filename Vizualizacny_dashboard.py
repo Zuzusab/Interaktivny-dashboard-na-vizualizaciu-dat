@@ -364,6 +364,59 @@ if subor is not None:
                 except Exception as e:
                     st.error(f" Chyba pri generovaní grafu: {str(e)}")
             else:  # Porovnávací režim
-                st.markdown("### Porovnanie vizualizačných knižníc")       
+                st.markdown("### Porovnanie vizualizačných knižníc") 
+
+                 # vyber typu grafu pre porovnanie len tie ktore vedia vsetky kniznice generovat
+                chart_type = st.selectbox(
+                    " Vyberte typ grafu na porovnanie:",
+                    ["Scatter Plot", "Line Plot", "Bar Chart", "Histogram", "Box Plot"]
+                )
+                
+                # vyber premennych
+                if graf in ["Scatter Plot", "Line Plot"]:
+                    stl1, stl2 = st.columns(2)
+                    with stl1:
+                        xx = st.selectbox("X os:", numericke if numericke else sltpce)
+                    with stl2:
+                        yy = st.selectbox("Y os:", numericke if numericke else sltpce)
+                
+                elif graf == "Bar Chart":
+                    stl1, stl2 = st.columns(2)
+                    with stl1:
+                        xx = st.selectbox("Kategória:", kategorialne if kategorialne else sltpce)
+                    with stl2:
+                        yy = st.selectbox("Hodnota:", numericke if numericke else sltpce)
+                
+                elif graf == "Histogram":
+                    xx = st.selectbox("Premenná:", numericke if numericke else sltpce)
+                    bins = st.slider("Počet binov:", 5, 100, 30)
+                    yy = None
+                
+                elif graf == "Box Plot":
+                    stl1, stl2 = st.columns(2)
+                    with stl1:
+                        xx = st.selectbox("Kategória (voliteľné):", ["Žiadna"] + kategorialne)
+                        xx = None if xx == "Žiadna" else xx
+                    with stl2:
+                        yy = st.selectbox("Hodnota:", numericke if numericke else sltpce)
+                
+                 # vyber kniznic na porovnanie
+                kniznice = st.multiselect(
+                    " Vyberte knižnice na porovnanie:",
+                    ["Matplotlib", "Seaborn", "Plotly", "Bokeh", "Altair"],
+                )
+
+                if st.button(" Porovnať knižnice", use_container_width=True):
+                    stl = st.columns(min(len(kniznice), 2))
+
+                    for i, kniznica in enumerate(kniznice):
+                        with stl[i % 2]:
+                            st.markdown(f'{kniznica}')
+
+                            try:
+                                if kniznica == "Matplotlib":
+                                    
+
+
     except Exception as e:
         st.error(f" Chyba pri načítaní súboru: {str(e)}")
