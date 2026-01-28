@@ -1,6 +1,9 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+# Dočasný fix pre Bokeh kompatibilitu
+if not hasattr(np, 'bool8'):
+    np.bool8 = np.bool_
 import matplotlib.pyplot as plt
 import seaborn as sns
 import plotly.express as px
@@ -12,6 +15,9 @@ from mpl_toolkits.mplot3d import Axes3D
 from scipy.interpolate import griddata
 import altair as alt
 import io
+from scipy.interpolate import griddata
+
+
 
 # konfiguracia stranky
 st.set_page_config(page_title="Vizualizačný Dashboard", layout="wide", initial_sidebar_state="collapsed")
@@ -69,7 +75,7 @@ if subor is not None:
             with stl2:
                 grafy_2d = ["Scatter Plot", "Line Plot", "Bar Chart", "Histogram", 
                             "Box Plot", "Heatmap", "Pie Chart"]
-                grafy_3d = ["3D Scatter Plot", "3D Surface Plot", "3D Line Plot"]
+                grafy_3d = ["3D Surface Plot", "3D Wireframe Plot"]
                 
             if kniznica == "Seaborn":
                 dostupne_grafy = [g for g in grafy_2d if g != "Pie Chart"]
@@ -131,7 +137,7 @@ if subor is not None:
                 xx = st.selectbox("Kategória:", kategorialne if kategorialne else sltpce)
                 yy = None
             
-            elif graf in ["3D Scatter Plot", "3D Surface Plot", "3D Line Plot"]:
+            elif graf in ["3D Surface Plot", "3D Wireframe Plot"]:
                 stl1, stl2, stl3 = st.columns(3)
                 with stl1:
                     xx = st.selectbox("Os X:", numericke if numericke else sltpce)
@@ -139,44 +145,77 @@ if subor is not None:
                     yy = st.selectbox("Os Y:", numericke if numericke else sltpce)
                 with stl3:
                     zz = st.selectbox("Os Z:", numericke if numericke else sltpce)
-                if graf == "3D Line Plot":
-                    max_body = st.slider("Maximálny počet bodov:", 100, 5000, 1000, step=100)
+                
+                # nastavenia pre interpoláciu/mriezku
+                rozlisenie = st.slider("Rozlíšenie grafu:", 20, 200, 100, step=10, 
+                                    help="Vyššie rozlíšenie = hladší graf, ale pomalší výpočet")
 
             if st.button(" Vygenerovať graf", type="primary", use_container_width=True):
                 st.markdown(f"{graf} - {kniznica}")
                 try:
                     if kniznica == "Matplotlib":
-                        if graf in ["3D Scatter Plot", "3D Line Plot", "3D Surface Plot"]:
+                        if graf in ["3D Surface Plot", "3D Wireframe Plot"]:
                             fig = plt.figure(figsize=(12,8))
                             ax = fig.add_subplot(111, projection = '3d')
-                            
-                            if graf == "3D Scatter Plot":
-                                ax.scatter(df[xx], df[yy], df[zz])
-                                ax.set_xlabel(xx)
-                                ax.set_ylabel(yy)
-                                ax.set_zlabel(zz)
-
-                            elif graf == "3D Line Plot":
-                                st.warning("3D Line Plot je vhodný len pre usporiadané dáta s menej ako 500 bodmi.")
-                                ax.plot(df[xx],df[yy], df[zz])
-                                ax.set_xlabel(xx)
-                                ax.set_ylabel(yy)
-                                ax.set_zlabel(zz)
-
-                            elif graf == "3D Surface Plot":
-                                data_clean = df[[xx, yy, zz]].dropna()
+                        
+                            if graf == "3D Surface Plot":
+                                data_clean = df[[xx, yy, zz]].dropna() #odstrani riadky kde je hodnota NaN
+                                #vytvori mriezku
                                 xi = np.linspace(data_clean[xx].min(), data_clean[xx].max(), 50)
                                 yi = np.linspace(data_clean[yy].min(), data_clean[yy].max(), 50)
                                 XI, YI = np.meshgrid(xi, yi)
-                                ZI = griddata((data_clean[xx], data_clean[yy]), data_clean[zz], (XI, YI), method='cubic')
+                                ZI = griddata((data_clean[xx], data_clean[yy]), data_clean[zz], (XI, YI), method='cubic') #linearna interpolacia
                                 
-                                surf = ax.plot_surface(XI, YI, ZI, cmap='viridis', alpha=0.8)
-                                fig.colorbar(surf, ax=ax, shrink=0.5)
+                                surf = ax.plot_surface(XI, YI, ZI, cmap='viridis', alpha=0.8) # vykresli 3D plochu
+                                fig.colorbar(surf, ax=ax, shrink=0.5) # farebna legenda
                                 ax.set_xlabel(xx)
                                 ax.set_ylabel(yy)
                                 ax.set_zlabel(zz)
+
+                            elif graf == "3D Wireframe Plot":
+                                fig = plt.figure(figsize=(10, 7))
+                                ax = fig.add_subplot(111, projection='3d')
+                                
+                                xi = np.linspace(df[xx].min(), df[xx].max(), rozlisenie)
+                                yi = np.linspace(df[yy].min(), df[yy].max(), rozlisenie)
+                                X, Y = np.meshgrid(xi, yi)
+                                Z = griddata((df[xx], df[yy]), df[zz], (X, Y), method='cubic')
+                                
+                                ax.plot_wireframe(X, Y, Z, color='darkblue', alpha=0.6, linewidth=0.5)
+                                ax.set_xlabel(xx)
+                                ax.set_ylabel(yy)
+                                ax.set_zlabel(zz)
+                                st.pyplot(fig)
+
+                            elif graf == "3D Bar Chart":
+                                fig = plt.figure(figsize=(10, 7))
+                                ax = fig.add_subplot(111, projection='3d')
+                                
+                                # Agreguj dáta do skupín
+                                x_bins = pd.cut(df[xx], bins=10)
+                                y_bins = pd.cut(df[yy], bins=10)
+                                grouped = df.groupby([x_bins, y_bins])[zz].mean().reset_index()
+                                
+                                x_pos = range(len(grouped[xx].cat.categories))
+                                y_pos = range(len(grouped[yy].cat.categories))
+                                
+                                xpos, ypos = np.meshgrid(x_pos, y_pos)
+                                xpos = xpos.flatten()
+                                ypos = ypos.flatten()
+                                zpos = np.zeros_like(xpos)
+                                
+                                dx = dy = 0.8
+                                dz = grouped[zz].values
+                                
+                                ax.bar3d(xpos, ypos, zpos, dx, dy, dz, shade=True)
+                                ax.set_xlabel(xx)
+                                ax.set_ylabel(yy)
+                                ax.set_zlabel(zz)
+                                st.pyplot(fig)     
+                                         
                             plt.tight_layout()
                             st.pyplot(fig)
+
                         else:                
                             fig, ax = plt.subplots(figsize=(12, 6))
                                 
@@ -267,23 +306,28 @@ if subor is not None:
                             hodnoty = df[xx].value_counts()
                             fig = px.pie(values=hodnoty.values, names = hodnoty.index)
                         
-                        elif graf == "3D Scatter Plot":
-                            fig = px.scatter_3d(df, x=xx, y=yy, z=zz)
-                        
-                        elif graf == "3D Line Plot":
-                            if zz:
-                                df_sorted = df.sort_values(by=xx)
-                                fig = go.Figure(data=[go.Scatter3d(
-                                    x=df_sorted[xx], 
-                                    y=df_sorted[yy], 
-                                    z=df_sorted[zz],
-                                    mode='lines+markers',
-                                    marker=dict(size=4),
-                                    line=dict(width=2)
-                                )])
-                                fig.update_layout(title=f"3D Line Plot", scene=dict(xaxis_title=xx, yaxis_title=yy, zaxis_title=zz))
-                            else:
-                                st.warning("Pre 3D Line Plot musíte vybrať Z os!")
+                        elif graf == "3D Wireframe":
+                            xi = np.linspace(df[xx].min(), df[xx].max(), rozlisenie)
+                            yi = np.linspace(df[yy].min(), df[yy].max(), rozlisenie)
+                            X, Y = np.meshgrid(xi, yi)
+                            Z = griddata((df[xx], df[yy]), df[zz], (X, Y), method='cubic')
+                            
+                            fig = go.Figure(data=[go.Surface(
+                                x=X, y=Y, z=Z,
+                                colorscale='Viridis',
+                                showscale=True,
+                                contours=dict(
+                                    z=dict(show=True, usecolormap=True, highlightcolor="limegreen", project=dict(z=True))
+                                )
+                            )])
+                            fig.update_layout(
+                                scene=dict(
+                                    xaxis_title=xx,
+                                    yaxis_title=yy,
+                                    zaxis_title=zz
+                                ),
+                                height=600
+                            )
 
                         elif graf == "3D Surface Plot":
                             if zz:
@@ -299,7 +343,6 @@ if subor is not None:
                                 )
                             else:
                                 st.warning("Pre 3D Surface Plot musíte vybrať Z os!")
-                        st.plotly_chart(fig, use_container_width=True)
 
                     elif kniznica == "Bokeh":
                         fig = figure(width=800, height=400, title=graf)
@@ -363,58 +406,68 @@ if subor is not None:
 
                 except Exception as e:
                     st.error(f" Chyba pri generovaní grafu: {str(e)}")
-            else:  # Porovnávací režim
-                st.markdown("### Porovnanie vizualizačných knižníc") 
+        else:  # Porovnávací režim
+            st.markdown("### Porovnanie vizualizačných knižníc") 
 
-                 # vyber typu grafu pre porovnanie len tie ktore vedia vsetky kniznice generovat
-                chart_type = st.selectbox(
+             # vyber typu grafu pre porovnanie len tie ktore vedia vsetky kniznice generovat
+            chart_type = st.selectbox(
                     " Vyberte typ grafu na porovnanie:",
                     ["Scatter Plot", "Line Plot", "Bar Chart", "Histogram", "Box Plot"]
-                )
+            )
                 
                 # vyber premennych
-                if graf in ["Scatter Plot", "Line Plot"]:
+            if graf in ["Scatter Plot", "Line Plot"]:
                     stl1, stl2 = st.columns(2)
                     with stl1:
                         xx = st.selectbox("X os:", numericke if numericke else sltpce)
                     with stl2:
                         yy = st.selectbox("Y os:", numericke if numericke else sltpce)
                 
-                elif graf == "Bar Chart":
+            elif graf == "Bar Chart":
                     stl1, stl2 = st.columns(2)
                     with stl1:
                         xx = st.selectbox("Kategória:", kategorialne if kategorialne else sltpce)
                     with stl2:
                         yy = st.selectbox("Hodnota:", numericke if numericke else sltpce)
                 
-                elif graf == "Histogram":
+            elif graf == "Histogram":
                     xx = st.selectbox("Premenná:", numericke if numericke else sltpce)
                     bins = st.slider("Počet binov:", 5, 100, 30)
                     yy = None
                 
-                elif graf == "Box Plot":
+            elif graf == "Box Plot":
                     stl1, stl2 = st.columns(2)
                     with stl1:
                         xx = st.selectbox("Kategória (voliteľné):", ["Žiadna"] + kategorialne)
                         xx = None if xx == "Žiadna" else xx
                     with stl2:
                         yy = st.selectbox("Hodnota:", numericke if numericke else sltpce)
-                
+
+            elif graf in ["3D Scatter Plot", "3D Surface Plot", "3D Line Plot"]:
+                    stl1, stl2, stl3 = st.columns(3)
+                    with stl1:
+                        xx = st.selectbox("Os X:", numericke if numericke else sltpce)
+                    with stl2:
+                        yy = st.selectbox("Os Y:", numericke if numericke else sltpce)
+                    with stl3:
+                        zz = st.selectbox("Os Z:", numericke if numericke else sltpce)
+                    if graf == "3D Line Plot":
+                        max_body = st.slider("Maximálny počet bodov:", 100, 5000, 1000, step=100)
                  # vyber kniznic na porovnanie
-                kniznice = st.multiselect(
+            kniznice = st.multiselect(
                     " Vyberte knižnice na porovnanie:",
                     ["Matplotlib", "Seaborn", "Plotly", "Bokeh", "Altair"],
                 )
-
-                if st.button(" Porovnať knižnice", use_container_width=True):
+                #zakladneg = 
+            if st.button(" Porovnať knižnice", use_container_width=True):
                     stl = st.columns(min(len(kniznice), 2))
 
                     for i, kniznica in enumerate(kniznice):
                         with stl[i % 2]:
                             st.markdown(f'{kniznica}')
 
-                            try:
-                                if kniznica == "Matplotlib":
+                            #try:
+                               # if kniznica == "Matplotlib":
                                     
 
 
