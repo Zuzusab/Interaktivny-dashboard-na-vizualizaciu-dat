@@ -150,7 +150,7 @@ if subor is not None:
             with stl1:
                 kniznica = st.selectbox(
                     " Vyberte vizualizačnú knižnicu:",
-                    ["Matplotlib", "Seaborn", "Plotly", "Bokeh", "Altair"]
+                    ["Matplotlib", "Seaborn", "Plotly", "Bokeh", "Altair"], key="std_kniznica"
                 )
         
             with stl2:
@@ -173,7 +173,7 @@ if subor is not None:
             elif kniznica == "Altair":
                 dostupne_grafy = [g for g in grafy_2d if g not in ["Pie Chart", "Heatmap"]]
 
-            graf = st.selectbox(" Vyberte typ grafu:", dostupne_grafy)
+            graf = st.selectbox(" Vyberte typ grafu:", dostupne_grafy, key="std_graf")
             
             if kniznica not in ["Matplotlib", "Plotly"]:
                 st.caption("Pre 3D grafy vyberte Matplotlib alebo Plotly")
@@ -183,54 +183,54 @@ if subor is not None:
             if graf in ["Scatter Plot", "Line Plot"]:
                 stl1, stl2 = st.columns(2)
                 with stl1:
-                    xx = st.selectbox("X os:", numericke if numericke else sltpce)
+                    xx = st.selectbox("X os:", numericke if numericke else sltpce, key="std_x")
                 with stl2:
-                    yy = st.selectbox("Y os:", numericke if numericke else sltpce)
+                    yy = st.selectbox("Y os:", numericke if numericke else sltpce, key="std_y")
 
             elif graf == "Bar Chart":
                 stl1, stl2 = st.columns(2)
                 with stl1:
-                    xx = st.selectbox("Kategória:", kategorialne if kategorialne else sltpce)
+                    xx = st.selectbox("Kategória:", kategorialne if kategorialne else sltpce, key="std_xx")
                 with stl2:
-                    yy = st.selectbox("Hodnota:", numericke if numericke else sltpce)
+                    yy = st.selectbox("Hodnota:", numericke if numericke else sltpce, key="std_yy")
             
             elif graf == "Histogram":
                 stl1, stl2 = st.columns(2)
                 with stl1:
-                    xx = st.selectbox("Premenná:", numericke if numericke else sltpce)
+                    xx = st.selectbox("Premenná:", numericke if numericke else sltpce, key="stdx")
                 with stl2:
-                    bins = st.slider("Počet binov:", 5, 100, 30)
+                    bins = st.slider("Počet binov:", 5, 100, 30, key="std_bins")
                 yy = None
             
             elif graf == "Box Plot":
                 stl1, stl2 = st.columns(2)
                 with stl1:
-                    xx = st.selectbox("Kategória (voliteľné):", ["Žiadna"] + kategorialne)
+                    xx = st.selectbox("Kategória (voliteľné):", ["Žiadna"] + kategorialne, key="stdxx")
                     xx = None if xx == "Žiadna" else xx
                 with stl2:
-                    yy = st.selectbox("Hodnota:", numericke if numericke else sltpce)
+                    yy = st.selectbox("Hodnota:", numericke if numericke else sltpce, key="stdyy")
             
             elif graf == "Heatmap":
-                sltp = st.multiselect("Vyberte premenné:", numericke, default=numericke[:5] if len(numericke) >= 5 else numericke)
+                sltp = st.multiselect("Vyberte premenné:", numericke, default=numericke[:5] if len(numericke) >= 5 else numericke, key="stad_x")
                 xx = yy = None
             
             elif graf == "Pie Chart":
-                xx = st.selectbox("Kategória:", kategorialne if kategorialne else sltpce)
+                xx = st.selectbox("Kategória:", kategorialne if kategorialne else sltpce, key="stadx")
                 yy = None
             
             elif graf in ["3D Surface Plot", "3D Wireframe Plot"]:
                 stl1, stl2, stl3 = st.columns(3)
                 with stl1:
-                    xx = st.selectbox("Os X:", numericke if numericke else sltpce)
+                    xx = st.selectbox("Os X:", numericke if numericke else sltpce, key="stand_x")
                 with stl2:
-                    yy = st.selectbox("Os Y:", numericke if numericke else sltpce)
+                    yy = st.selectbox("Os Y:", numericke if numericke else sltpce, key="stand_y")
                 with stl3:
-                    zz = st.selectbox("Os Z:", numericke if numericke else sltpce)
+                    zz = st.selectbox("Os Z:", numericke if numericke else sltpce, key="stand_z")
                 
                 rozlisenie = st.slider("Rozlíšenie grafu:", 20, 200, 100, step=10, 
                                     help="Vyššie rozlíšenie = hladší graf, ale pomalší výpočet")
 
-            if st.button(" Vygenerovať graf", type="primary", use_container_width=True):
+            if st.button(" Vygenerovať graf", type="primary", use_container_width=True, key="generovanie"):
                 try:
                     fig = None
                     
@@ -517,7 +517,7 @@ if subor is not None:
         
             kniznice = st.multiselect(
                 " Vyberte knižnice na porovnanie:",
-                ["Matplotlib", "Seaborn", "Plotly", "Bokeh", "Altair"],
+                ["Matplotlib", "Seaborn", "Plotly", "Bokeh", "Altair"], key="prvk"
             )
             
             if len(kniznice) == 2 and set(kniznice) == {"Matplotlib", "Plotly"}:
@@ -528,64 +528,62 @@ if subor is not None:
             
             graf = st.selectbox(
                 " Vyberte typ grafu na porovnanie:",
-                dostupne_grafy
+                dostupne_grafy, key="prvg"
             )
         
             # vyber premennych
             if graf in ["Scatter Plot", "Line Plot"]:
                 stl1, stl2 = st.columns(2)
                 with stl1:
-                    xx = st.selectbox("X os:", numericke if numericke else sltpce)
+                    xx = st.selectbox("X os:", numericke if numericke else sltpce, key="prvx")
                 with stl2:
-                    yy = st.selectbox("Y os:", numericke if numericke else sltpce)
+                    yy = st.selectbox("Y os:", numericke if numericke else sltpce, key="prvy")
                 
             elif graf == "Bar Chart":
                 stl1, stl2 = st.columns(2)
                 with stl1:
-                    xx = st.selectbox("Kategória:", kategorialne if kategorialne else sltpce)
+                    xx = st.selectbox("Kategória:", kategorialne if kategorialne else sltpce, key="prvxx")
                 with stl2:
-                    yy = st.selectbox("Hodnota:", numericke if numericke else sltpce)
+                    yy = st.selectbox("Hodnota:", numericke if numericke else sltpce, key="prvyy")
                 
             elif graf == "Histogram":
-                xx = st.selectbox("Premenná:", numericke if numericke else sltpce)
-                bins = st.slider("Počet binov:", 5, 100, 30)
+                xx = st.selectbox("Premenná:", numericke if numericke else sltpce, key="prvh")
+                bins = st.slider("Počet binov:", 5, 100, 30, key="prvb")
                 yy = None
                 
             elif graf == "Box Plot":
                 stl1, stl2 = st.columns(2)
                 with stl1:
-                    xx = st.selectbox("Kategória (voliteľné):", ["Žiadna"] + kategorialne)
+                    xx = st.selectbox("Kategória (voliteľné):", ["Žiadna"] + kategorialne, key="porvx")
                     xx = None if xx == "Žiadna" else xx
                 with stl2:
-                    yy = st.selectbox("Hodnota:", numericke if numericke else sltpce)
+                    yy = st.selectbox("Hodnota:", numericke if numericke else sltpce, key="porvy")
             
             elif graf == "Heatmap":
-                sltp = st.multiselect("Vyberte premenné:", numericke, default=numericke[:5] if len(numericke) >= 5 else numericke)
+                sltp = st.multiselect("Vyberte premenné:", numericke, default=numericke[:5] if len(numericke) >= 5 else numericke, key="prhx")
                 xx = yy = None
             
             elif graf == "Pie Chart":
-                xx = st.selectbox("Kategória:", kategorialne if kategorialne else sltpce)
+                xx = st.selectbox("Kategória:", kategorialne if kategorialne else sltpce, key="prpcx")
                 yy = None
             
             elif graf in ["3D Surface Plot", "3D Wireframe Plot"]:
                 stl1, stl2, stl3 = st.columns(3)
                 with stl1:
-                    xx = st.selectbox("Os X:", numericke if numericke else sltpce)
+                    xx = st.selectbox("Os X:", numericke if numericke else sltpce, key="prv3x")
                 with stl2:
-                    yy = st.selectbox("Os Y:", numericke if numericke else sltpce)
+                    yy = st.selectbox("Os Y:", numericke if numericke else sltpce, key="pr3y")
                 with stl3:
-                    zz = st.selectbox("Os Z:", numericke if numericke else sltpce)
+                    zz = st.selectbox("Os Z:", numericke if numericke else sltpce, key="pr3z")
                 
-                rozlisenie = st.slider("Rozlíšenie grafu:", 20, 200, 100, step=10, 
+                rozlisenie = st.slider("Rozlíšenie grafu:", 20, 200, 100, step=10, key="prvbin",
                                     help="Vyššie rozlíšenie = hladší graf, ale pomalší výpočet")
             
-            if st.button(" Porovnať knižnice", use_container_width=True):
+            if st.button(" Porovnať knižnice", use_container_width=True, key="prvgenerovanie"):
                 if len(kniznice) < 2:
                     st.warning("Vyberte aspoň 2 knižnice na porovnanie")
                 else:
-                    # Implementácia porovnávacieho režimu ostáva rovnaká ako v pôvodnom kóde
-                    st.info("Porovnávací režim - implementácia podľa pôvodného kódu")
-                    if st.button(" Porovnať knižnice", use_container_width=True):
+                    # Implementácia porovnávacieho režimu 
                         if (len(kniznice) == 2 and set(kniznice) == {"Matplotlib", "Plotly"}):
                             
                             # Inicializuj premenné ak neexistujú
@@ -750,7 +748,7 @@ if subor is not None:
                                         )
                                     else:
                                         st.warning("Pre 3D Surface Plot musíte vybrať Z os!")
-                                
+                                st.plotly_chart(fig)
                         else:
                             # Normálne správanie pre ostatné kombinácie
                             stl = st.columns(min(len(kniznice), 2))
