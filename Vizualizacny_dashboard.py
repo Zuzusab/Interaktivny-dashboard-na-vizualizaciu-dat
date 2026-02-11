@@ -523,6 +523,8 @@ if subor is not None:
             if len(kniznice) == 2 and set(kniznice) == {"Matplotlib", "Plotly"}:
                 dostupne_grafy = ["Scatter Plot", "Line Plot", "Bar Chart", "Histogram", "Box Plot", 
                                 "Pie Chart", "3D Surface Plot", "3D Wireframe Plot"]
+            elif len(kniznice) == 2 and set(kniznice) == {"Matplotlib", "Bokeh"}:
+                dostupne_grafy = ["Scatter Plot", "Line Plot", "Bar Chart", "Histogram"]
             else:
                 dostupne_grafy = ["Scatter Plot", "Line Plot", "Bar Chart", "Histogram", "Box Plot"]
             
@@ -748,15 +750,176 @@ if subor is not None:
                                         )
                                     else:
                                         st.warning("Pre 3D Surface Plot musíte vybrať Z os!")
-                                st.plotly_chart(fig)
-                        else:
-                            # Normálne správanie pre ostatné kombinácie
-                            stl = st.columns(min(len(kniznice), 2))
-                            for i, kniznica in enumerate(kniznice):
-                                with stl[i % 2]:
-                                    st.markdown(f'### {kniznica}')       
-                                    st.plotly_chart(fig, use_container_width=True)
+                                plt.tight_layout()
+                                st.pyplot(fig)
+                            
+                        elif (len(kniznice) == 2 and set(kniznice) == {"Matplotlib", "Seaborn"}):
+                            
+                            # Inicializuj premenné ak neexistujú
+                            if 'rozlisenie' not in locals():
+                                rozlisenie = 100
+                            if 'sltp' not in locals():
+                                sltp = None
+                            if 'zz' not in locals():
+                                zz = None
+                    
+                            stl1, stl2 = st.columns(2)
+                            
+                            # urcenie, ktora kniznica ide do ktoreho stlpca
+                            if kniznice[0] == "Matplotlib":
+                                stl_matplotlib = stl1
+                                stl_seaborn = stl2
+                            else:
+                                stl_matplotlib = stl2
+                                stl_seaborn = stl1
+                            
+                            with stl_matplotlib:
+                                st.markdown("### Matplotlib")
+                                fig, ax = plt.subplots(figsize=(12, 6))
+                                        
+                                if graf == "Scatter Plot":
+                                    ax.scatter(df[xx], df[yy], alpha=0.6)
+                                    ax.set_xlabel(xx)
+                                    ax.set_ylabel(yy)
+                                    
+                                elif graf == "Line Plot":
+                                    df_agg = df.groupby(xx)[yy].mean().reset_index().sort_values(by=xx)
+                                    ax.plot(df_agg[xx], df_agg[yy])
+                                    ax.set_xlabel(xx)
+                                    ax.set_ylabel(yy)
+                                    
+                                elif graf == "Bar Chart":
+                                    df.groupby(xx)[yy].mean().plot(kind='bar', ax=ax)
+                                    ax.set_xlabel(xx)
+                                    ax.set_ylabel(f"Priemer {yy}")
 
+                                elif graf == "Histogram":
+                                    data_clean = df[xx].dropna()
+                                    counts, bins_edges, patches = ax.hist(data_clean, bins=bins)
+                                    ax.set_xlabel(xx)
+                                    ax.set_ylabel('Počet')
 
+                                elif graf == "Box Plot":
+                                        if xx:
+                                            df.boxplot(column=yy, by=xx, ax=ax)
+                                        else:
+                                            df[yy].plot(kind='box', ax=ax)
+                                plt.tight_layout()
+                                st.pyplot(fig)
+                            
+                            with stl_seaborn:
+                                    st.markdown("### Seaborn")
+                                    fig, ax = plt.subplots(figsize=(12, 6))
+
+                                    if graf == "Scatter Plot":
+                                        sns.scatterplot(data=df, x=xx, y=yy, ax=ax)
+
+                                    elif graf == "Line Plot":
+                                        df_agg = df.groupby(xx)[yy].mean().reset_index().sort_values(by=xx)
+                                        sns.lineplot(data=df_agg, x=xx, y=yy, ax=ax)
+                                    
+                                    elif graf == "Bar Chart":
+                                        sns.barplot(data=df, x=xx, y=yy, ax=ax)
+
+                                    elif graf == "Histogram":
+                                        sns.histplot(data=df, x=xx, bins=bins, ax=ax)
+                                    
+                                    elif graf == "Box Plot":
+                                        sns.boxplot(data=df, x=xx, y=yy, ax=ax)
+
+                                    elif graf == "Heatmap":
+                                        if sltp:
+                                            corr = df[sltp].corr()
+                                            sns.heatmap(corr, annot=True, center=0, ax=ax)
+
+                                    plt.tight_layout()
+                                    st.pyplot(fig)
+                        elif (len(kniznice) == 2 and set(kniznice) == {"Matplotlib", "Bokeh"}):
+                            
+                            # Inicializuj premenné ak neexistujú
+                            if 'rozlisenie' not in locals():
+                                rozlisenie = 100
+                            if 'sltp' not in locals():
+                                sltp = None
+                            if 'zz' not in locals():
+                                zz = None
+                    
+                            stl1, stl2 = st.columns(2)
+                            
+                            # urcenie, ktora kniznica ide do ktoreho stlpca
+                            if kniznice[0] == "Matplotlib":
+                                stl_matplotlib = stl1
+                                stl_bokeh = stl2
+                            else:
+                                stl_matplotlib = stl2
+                                stl_bokeh = stl1
+                                # rozsahy osí pre Line Plot
+                            if graf == "Line Plot":
+                                df_agg = df.groupby(xx)[yy].mean().reset_index().sort_values(by=xx)
+                                x_min, x_max = df_agg[xx].min(), df_agg[xx].max()
+                                y_min, y_max = df_agg[yy].min(), df_agg[yy].max()
+                                # 5% rezerva
+                                x_padding = (x_max - x_min) * 0.05
+                                y_padding = (y_max - y_min) * 0.05
+                                x_range = (x_min - x_padding, x_max + x_padding)
+                                y_range = (y_min - y_padding, y_max + y_padding)
+
+                            with stl_matplotlib:
+                                st.markdown("### Matplotlib")
+                                fig, ax = plt.subplots(figsize=(12, 6))
+                                        
+                                if graf == "Scatter Plot":
+                                    ax.scatter(df[xx], df[yy], alpha=0.6)
+                                    ax.set_xlabel(xx)
+                                    ax.set_ylabel(yy)
+                                    
+                                elif graf == "Line Plot":
+                                    df_agg = df.groupby(xx)[yy].mean().reset_index().sort_values(by=xx)
+                                    ax.plot(df_agg[xx], df_agg[yy])
+                                    ax.set_xlabel(xx)
+                                    ax.set_ylabel(yy)
+                                    ax.set_xlim(x_range)
+                                    ax.set_ylim(y_range)
+                                    
+                                elif graf == "Bar Chart":
+                                    df.groupby(xx)[yy].mean().plot(kind='bar', ax=ax)
+                                    ax.set_xlabel(xx)
+                                    ax.set_ylabel(f"Priemer {yy}")
+
+                                elif graf == "Histogram":
+                                    data_clean = df[xx].dropna()
+                                    counts, bins_edges, patches = ax.hist(data_clean, bins=bins)
+                                    ax.set_xlabel(xx)
+                                    ax.set_ylabel('Počet')
+
+                                plt.tight_layout()
+                                st.pyplot(fig) 
+
+                            with stl_bokeh:
+                                st.markdown("### Bokeh")
+                                fig = figure(width=800, height=400, title=graf)
+                        
+                                if graf == "Scatter Plot":
+                                    fig.scatter(df[xx].values, df[yy].values, size=8, alpha=0.6)
+                                
+                                elif graf == "Line Plot":
+                                    df_sorted = df.groupby(xx)[yy].mean().reset_index().sort_values(by=xx)
+                                    fig = figure(width=800, height=400, title=graf, x_range=x_range, y_range=y_range)
+                                    fig.line(df_sorted[xx].values, df_sorted[yy].values, line_width=2)
+                                
+                                elif graf == "Bar Chart":
+                                    grouped = df.groupby(xx)[yy].mean()
+                                    fig.vbar(x=list(range(len(grouped))), top=grouped.values, width=0.8)
+                                    fig.xaxis.ticker = list(range(len(grouped)))
+
+                                elif graf == "Histogram":
+                                    hist, edges = np.histogram(df[xx].dropna(), bins=bins)
+                                    fig.quad(top=hist, bottom=0, left=edges[:-1], right=edges[1:], alpha=0.7)
+                                
+                                fig.xaxis.axis_label = xx if xx else ""
+                                fig.yaxis.axis_label = yy if yy else ""
+                                st.bokeh_chart(fig)
+
+                                
     except Exception as e:
         st.error(f" Chyba pri načítaní súboru: {str(e)}")
