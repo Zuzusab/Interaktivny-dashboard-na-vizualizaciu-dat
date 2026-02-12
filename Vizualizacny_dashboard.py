@@ -523,9 +523,14 @@ if subor is not None:
             if len(kniznice) == 2 and set(kniznice) == {"Matplotlib", "Plotly"}:
                 dostupne_grafy = ["Scatter Plot", "Line Plot", "Bar Chart", "Histogram", "Box Plot", 
                                 "Pie Chart", "3D Surface Plot", "3D Wireframe Plot"]
+                
             elif len(kniznice) == 2 and set(kniznice) == {"Matplotlib", "Bokeh"}:
                 dostupne_grafy = ["Scatter Plot", "Line Plot", "Bar Chart", "Histogram"]
-            elif len(kniznice) == 2 and set(kniznice) == {"Seaborn", "Bokeh"}:
+            
+            elif len(kniznice) == 2 and set(kniznice) == {"Plotly", "Bokeh"}:
+                dostupne_grafy = ["Scatter Plot", "Line Plot", "Bar Chart", "Histogram"]
+
+            elif len(kniznice) == 2 and set(kniznice) == {"Altair", "Bokeh"}:
                 dostupne_grafy = ["Scatter Plot", "Line Plot", "Bar Chart", "Histogram"]
             else:
                 dostupne_grafy = ["Scatter Plot", "Line Plot", "Bar Chart", "Histogram", "Box Plot"]
@@ -1231,51 +1236,315 @@ if subor is not None:
                                 plt.tight_layout()
                                 st.pyplot(fig)
 
-                        with stl_altair:
-                                st.markdown("### Altair")  
-                                if graf == "Scatter Plot":
-                                    fig = alt.Chart(df).mark_circle(size=60).encode(
-                                        x=xx, y=yy, tooltip=[xx, yy]
-                                    ).interactive()
+                            with stl_altair:
+                                    st.markdown("### Altair")  
+                                    if graf == "Scatter Plot":
+                                        fig = alt.Chart(df).mark_circle(size=60).encode(
+                                            x=xx, y=yy, tooltip=[xx, yy]
+                                        ).interactive()
 
+                                    elif graf == "Line Plot":
+                                        df_agg = df.groupby(xx)[yy].mean().reset_index().sort_values(by=xx)
+                                        # Získaj rozsah Y osi
+                                        y_min = df_agg[yy].min()
+                                        y_max = df_agg[yy].max()
+                                        y_padding = (y_max - y_min) * 0.1
+                                        
+                                        fig = alt.Chart(df_agg).mark_line(point=True).encode(
+                                            x=alt.X(xx, title=xx),
+                                            y=alt.Y(yy, title=yy, scale=alt.Scale(domain=[y_min - y_padding, y_max + y_padding])),
+                                            tooltip=[xx, yy]
+                                        ).interactive()
+
+                                    elif graf == "Bar Chart":
+                                        fig = alt.Chart(df).mark_bar().encode(
+                                            x=xx, y=f'mean({yy})', tooltip=[xx, f'mean({yy})']
+                                        ).interactive()
+                                    
+                                    elif graf == "Histogram":
+                                        # Vypočíta rovnaké hranice binov ako má Seaborn
+                                        data_clean = df[xx].dropna()
+                                        min_val = float(data_clean.min())
+                                        max_val = float(data_clean.max())
+                                        bin_width = (max_val - min_val) / bins
+                                        
+                                        fig = alt.Chart(df).mark_bar().encode(
+                                            alt.X(f'{xx}:Q', 
+                                                bin=alt.Bin(step=bin_width, extent=[min_val, max_val]),
+                                                title=xx),
+                                            y=alt.Y('count()', title='Počet'),
+                                        ).interactive()
+                                    
+                                    elif graf == "Box Plot":
+                                        fig = alt.Chart(df).mark_boxplot().encode(
+                                            x=f'{xx}:N' if xx else alt.value(0), #použije sa ako kategória (:N = nominal) na osi X alebo všetky hodnoty budú v jednom boxe (na pozícii 0)
+                                            y=f'{yy}:Q'
+                                        )
+                                    st.altair_chart(fig, use_container_width=True)
+
+                        elif (len(kniznice) == 2 and set(kniznice) == {"Plotly", "Bokeh"}):
+                            # Inicializuj premenné ak neexistujú
+                            if 'rozlisenie' not in locals():
+                                rozlisenie = 100
+                            if 'sltp' not in locals():
+                                sltp = None 
+                    
+                            stl1, stl2 = st.columns(2)
+                            
+                            # urcenie, ktora kniznica ide do ktoreho stlpca
+                            if kniznice[0] == "Plotly":
+                                stl_plotly = stl1
+                                stl_bokeh = stl2
+                            else:
+                                stl_plotly = stl2
+                                stl_bokeh = stl1
+
+                            with stl_plotly:
+                                st.markdown("### Plotly")
+                                if graf == "Scatter Plot":
+                                    fig = px.scatter(df, x=xx, y=yy)
+                                
                                 elif graf == "Line Plot":
                                     df_agg = df.groupby(xx)[yy].mean().reset_index().sort_values(by=xx)
-                                    # Získaj rozsah Y osi
-                                    y_min = df_agg[yy].min()
-                                    y_max = df_agg[yy].max()
-                                    y_padding = (y_max - y_min) * 0.1
-                                    
-                                    fig = alt.Chart(df_agg).mark_line(point=True).encode(
-                                        x=alt.X(xx, title=xx),
-                                        y=alt.Y(yy, title=yy, scale=alt.Scale(domain=[y_min - y_padding, y_max + y_padding])),
-                                        tooltip=[xx, yy]
-                                    ).interactive()
-
+                                    fig = px.line(df_agg, x=xx, y=yy, markers=True)
+                                
                                 elif graf == "Bar Chart":
-                                    fig = alt.Chart(df).mark_bar().encode(
-                                        x=xx, y=f'mean({yy})', tooltip=[xx, f'mean({yy})']
-                                    ).interactive()
+                                    df_grouped = df.groupby(xx)[yy].mean().reset_index()
+                                    fig = px.bar(df_grouped, x=xx, y=yy, labels={yy: f"Priemer {yy}"}, text=yy)
+                                    fig.update_traces(texttemplate='%{text:.2f}', textposition='outside')
+                                    fig.update_layout(xaxis_title=xx, yaxis_title=f"Priemer {yy}")
                                 
                                 elif graf == "Histogram":
-                                    # Vypočíta rovnaké hranice binov ako má Seaborn
                                     data_clean = df[xx].dropna()
                                     min_val = float(data_clean.min())
                                     max_val = float(data_clean.max())
                                     bin_width = (max_val - min_val) / bins
                                     
-                                    fig = alt.Chart(df).mark_bar().encode(
-                                        alt.X(f'{xx}:Q', 
-                                            bin=alt.Bin(step=bin_width, extent=[min_val, max_val]),
-                                            title=xx),
-                                        y=alt.Y('count()', title='Počet'),
-                                    ).interactive()
-                                
-                                elif graf == "Box Plot":
-                                    fig = alt.Chart(df).mark_boxplot().encode(
-                                        x=f'{xx}:N' if xx else alt.value(0), #použije sa ako kategória (:N = nominal) na osi X alebo všetky hodnoty budú v jednom boxe (na pozícii 0)
-                                        y=f'{yy}:Q'
+                                    fig = px.histogram(df, x=xx, nbins=bins,
+                                                    range_x=[min_val, max_val])
+                                    fig.update_layout(
+                                        xaxis_title=xx,
+                                        yaxis_title='Počet',
+                                        bargap=0.1
                                     )
-                                st.altair_chart(fig, use_container_width=True)
+                                    fig.update_traces(xbins=dict(
+                                        start=min_val,
+                                        end=max_val,
+                                        size=bin_width
+                                    ))
+                                st.plotly_chart(fig, use_container_width=True)
+                            with stl_bokeh:
+                                st.markdown("### Bokeh")
+                                fig = figure(width=800, height=400, title=graf)
+                        
+                                if graf == "Scatter Plot":
+                                    fig.scatter(df[xx].values, df[yy].values, size=8, alpha=0.6)
+                                
+                                elif graf == "Line Plot":
+                                    df_sorted = df.groupby(xx)[yy].mean().reset_index().sort_values(by=xx)
+                                    fig = figure(width=800, height=400, title=graf)
+                                    fig.line(df_sorted[xx].values, df_sorted[yy].values, line_width=2)
+                                
+                                elif graf == "Bar Chart":
+                                    grouped = df.groupby(xx)[yy].mean()
+                                    fig.vbar(x=list(range(len(grouped))), top=grouped.values, width=0.8)
+                                    fig.xaxis.ticker = list(range(len(grouped)))
 
+                                elif graf == "Histogram":
+                                    hist, edges = np.histogram(df[xx].dropna(), bins=bins)
+                                    fig.quad(top=hist, bottom=0, left=edges[:-1], right=edges[1:], alpha=0.7)
+                                
+                                fig.xaxis.axis_label = xx if xx else ""
+                                fig.yaxis.axis_label = yy if yy else ""
+                                st.bokeh_chart(fig)       
+                        elif (len(kniznice) == 2 and set(kniznice) == {"Plotly", "Altair"}):
+                            # Inicializuj premenné ak neexistujú
+                            if 'rozlisenie' not in locals():
+                                rozlisenie = 100
+                            if 'sltp' not in locals():
+                                sltp = None 
+                    
+                            stl1, stl2 = st.columns(2)
+                            
+                            # urcenie, ktora kniznica ide do ktoreho stlpca
+                            if kniznice[0] == "Plotly":
+                                stl_plotly = stl1
+                                stl_altair = stl2
+                            else:
+                                stl_plotly = stl2
+                                stl_altair = stl1
+
+                            with stl_plotly:
+                                st.markdown("### Plotly")
+                                if graf == "Scatter Plot":
+                                    fig = px.scatter(df, x=xx, y=yy)
+                                
+                                elif graf == "Line Plot":
+                                    df_agg = df.groupby(xx)[yy].mean().reset_index().sort_values(by=xx)
+                                    fig = px.line(df_agg, x=xx, y=yy, markers=True)
+                                
+                                elif graf == "Bar Chart":
+                                    df_grouped = df.groupby(xx)[yy].mean().reset_index()
+                                    fig = px.bar(df_grouped, x=xx, y=yy, labels={yy: f"Priemer {yy}"}, text=yy)
+                                    fig.update_traces(texttemplate='%{text:.2f}', textposition='outside')
+                                    fig.update_layout(xaxis_title=xx, yaxis_title=f"Priemer {yy}")
+                                
+                                elif graf == "Histogram":
+                                    data_clean = df[xx].dropna()
+                                    min_val = float(data_clean.min())
+                                    max_val = float(data_clean.max())
+                                    bin_width = (max_val - min_val) / bins
+                                    
+                                    fig = px.histogram(df, x=xx, nbins=bins,
+                                                    range_x=[min_val, max_val])
+                                    fig.update_layout(
+                                        xaxis_title=xx,
+                                        yaxis_title='Počet',
+                                        bargap=0.1
+                                    )
+                                    fig.update_traces(xbins=dict(
+                                        start=min_val,
+                                        end=max_val,
+                                        size=bin_width
+                                    ))
+
+                                elif graf == "Box Plot":
+                                    fig = px.box(df, x=xx, y=yy)
+
+                                st.plotly_chart(fig, use_container_width=True)
+                            with stl_altair:
+                                    st.markdown("### Altair")  
+                                    if graf == "Scatter Plot":
+                                        fig = alt.Chart(df).mark_circle(size=60, opacity=0.6).encode(
+                                        x=alt.X(f'{xx}:Q', title=xx, scale=alt.Scale(zero=False)),
+                                        y=alt.Y(f'{yy}:Q', title=yy, scale=alt.Scale(zero=False)),
+                                        tooltip=[xx, yy]
+                                    ).interactive()
+
+                                    elif graf == "Line Plot":
+                                        df_agg = df.groupby(xx)[yy].mean().reset_index().sort_values(by=xx)
+                                        # Získaj rozsah Y osi
+                                        y_min = df_agg[yy].min()
+                                        y_max = df_agg[yy].max()
+                                        y_padding = (y_max - y_min) * 0.1
+                                        
+                                        fig = alt.Chart(df_agg).mark_line(point=True).encode(
+                                            x=alt.X(xx, title=xx),
+                                            y=alt.Y(yy, title=yy, scale=alt.Scale(domain=[y_min - y_padding, y_max + y_padding])),
+                                            tooltip=[xx, yy]
+                                        ).interactive()
+
+                                    elif graf == "Bar Chart":
+                                        fig = alt.Chart(df).mark_bar().encode(
+                                        x=alt.X(xx, title=xx),          
+                                        y=alt.Y(f'mean({yy})', title=f"Priemer {yy}"), 
+                                        tooltip=[xx, f'mean({yy})']
+                                    ).interactive()
+                                    
+                                    elif graf == "Histogram":
+                                        # Vypočíta rovnaké hranice binov ako má Seaborn
+                                        data_clean = df[xx].dropna()
+                                        min_val = float(data_clean.min())
+                                        max_val = float(data_clean.max())
+                                        bin_width = (max_val - min_val) / bins
+                                        
+                                        fig = alt.Chart(df).mark_bar().encode(
+                                            alt.X(f'{xx}:Q', 
+                                                bin=alt.Bin(step=bin_width, extent=[min_val, max_val]),
+                                                title=xx),
+                                            y=alt.Y('count()', title='Počet'),
+                                        ).interactive()
+                                    
+                                    elif graf == "Box Plot":
+                                        fig = alt.Chart(df).mark_boxplot().encode(
+                                        x=alt.X(f'{xx}:N', title=xx),  
+                                        y=alt.Y(f'{yy}:Q', title=yy))
+                                    st.altair_chart(fig, use_container_width=True)
+
+                        elif (len(kniznice) == 2 and set(kniznice) == {"Bokeh", "Altair"}):
+                            # Inicializuj premenné ak neexistujú
+                            if 'rozlisenie' not in locals():
+                                rozlisenie = 100
+                            if 'sltp' not in locals():
+                                sltp = None
+                        
+                            stl1, stl2 = st.columns(2)
+                                
+                            # urcenie, ktora kniznica ide do ktoreho stlpca
+                            if kniznice[0] == "Bokeh":
+                                stl_bokeh = stl1
+                                stl_altair = stl2
+                            else:
+                                stl_bokeh = stl2
+                                stl_altair = stl1
+                                
+                            with stl_bokeh:
+                                st.markdown("### Bokeh")
+                                fig = figure(width=800, height=400, title=graf)
+                        
+                                if graf == "Scatter Plot":
+                                    fig.scatter(df[xx].values, df[yy].values, size=8, alpha=0.6)
+                                
+                                elif graf == "Line Plot":
+                                    df_sorted = df.groupby(xx)[yy].mean().reset_index().sort_values(by=xx)
+                                    fig = figure(width=800, height=400, title=graf)
+                                    fig.line(df_sorted[xx].values, df_sorted[yy].values, line_width=2)
+                                
+                                elif graf == "Bar Chart":
+                                    grouped = df.groupby(xx)[yy].mean()
+                                    fig.vbar(x=list(range(len(grouped))), top=grouped.values, width=0.8)
+                                    fig.xaxis.ticker = list(range(len(grouped)))
+
+                                elif graf == "Histogram":
+                                    hist, edges = np.histogram(df[xx].dropna(), bins=bins)
+                                    fig.quad(top=hist, bottom=0, left=edges[:-1], right=edges[1:], alpha=0.7)
+                                
+                                fig.xaxis.axis_label = xx if xx else ""
+                                fig.yaxis.axis_label = yy if yy else ""
+                                st.bokeh_chart(fig) 
+
+                            with stl_altair:
+                                    st.markdown("### Altair")  
+                                    if graf == "Scatter Plot":
+                                        fig = alt.Chart(df).mark_circle(size=60, opacity=0.6).encode(
+                                        x=alt.X(f'{xx}:Q', title=xx, scale=alt.Scale(zero=False)),
+                                        y=alt.Y(f'{yy}:Q', title=yy, scale=alt.Scale(zero=False)),
+                                        tooltip=[xx, yy]
+                                    ).interactive()
+
+                                    elif graf == "Line Plot":
+                                        df_agg = df.groupby(xx)[yy].mean().reset_index().sort_values(by=xx)
+                                        # Získaj rozsah Y osi
+                                        y_min = df_agg[yy].min()
+                                        y_max = df_agg[yy].max()
+                                        y_padding = (y_max - y_min) * 0.1
+                                        
+                                        fig = alt.Chart(df_agg).mark_line(point=True).encode(
+                                            x=alt.X(xx, title=xx),
+                                            y=alt.Y(yy, title=yy, scale=alt.Scale(domain=[y_min - y_padding, y_max + y_padding])),
+                                            tooltip=[xx, yy]
+                                        ).interactive()
+
+                                    elif graf == "Bar Chart":
+                                        fig = alt.Chart(df).mark_bar().encode(
+                                        x=alt.X(xx, title=xx),          
+                                        y=alt.Y(f'mean({yy})', title=f"Priemer {yy}"), 
+                                        tooltip=[xx, f'mean({yy})']
+                                    ).interactive()
+                                    
+                                    elif graf == "Histogram":
+                                        # Vypočíta rovnaké hranice binov ako má Seaborn
+                                        data_clean = df[xx].dropna()
+                                        min_val = float(data_clean.min())
+                                        max_val = float(data_clean.max())
+                                        bin_width = (max_val - min_val) / bins
+                                        
+                                        fig = alt.Chart(df).mark_bar().encode(
+                                            alt.X(f'{xx}:Q', 
+                                                bin=alt.Bin(step=bin_width, extent=[min_val, max_val]),
+                                                title=xx),
+                                            y=alt.Y('count()', title='Počet'),
+                                        ).interactive()
+                                    st.altair_chart(fig, use_container_width=True)
     except Exception as e:
         st.error(f" Chyba pri načítaní súboru: {str(e)}")
