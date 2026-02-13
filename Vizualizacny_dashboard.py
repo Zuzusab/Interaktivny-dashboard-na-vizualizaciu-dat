@@ -19,6 +19,299 @@ import base64
 from scipy.interpolate import griddata
 import kaleido
 
+def generate_chart(kniznica, graf, df, xx, yy, bins=None, sltp=None, zz=None, rozlisenie=100):
+
+    shared_data = {}
+    
+    if kniznica == "Matplotlib":
+        if graf in ["3D Surface Plot", "3D Wireframe Plot"]:
+            fig = plt.figure(figsize=(12, 8))
+            ax = fig.add_subplot(111, projection='3d')
+        
+            if graf == "3D Surface Plot":
+                data_clean = df[[xx, yy, zz]].dropna()
+                xi = np.linspace(data_clean[xx].min(), data_clean[xx].max(), 50)
+                yi = np.linspace(data_clean[yy].min(), data_clean[yy].max(), 50)
+                XI, YI = np.meshgrid(xi, yi)
+                ZI = griddata((data_clean[xx], data_clean[yy]), data_clean[zz], (XI, YI), method='cubic')
+                
+                surf = ax.plot_surface(XI, YI, ZI, cmap='viridis', alpha=0.8)
+                fig.colorbar(surf, ax=ax, shrink=0.5)
+                ax.set_xlabel(xx)
+                ax.set_ylabel(yy)
+                ax.set_zlabel(zz)
+
+            elif graf == "3D Wireframe Plot":
+                xi = np.linspace(df[xx].min(), df[xx].max(), rozlisenie)
+                yi = np.linspace(df[yy].min(), df[yy].max(), rozlisenie)
+                X, Y = np.meshgrid(xi, yi)
+                
+                points = np.column_stack((df[xx], df[yy]))
+                values = df[zz]
+                grid_points = np.column_stack((X.ravel(), Y.ravel()))
+                Z = griddata(points, values, grid_points, method='cubic').reshape(X.shape)
+                
+                ax.plot_wireframe(X, Y, Z, color='darkblue', alpha=0.6, linewidth=0.5)
+                ax.set_xlabel(xx)
+                ax.set_ylabel(yy)
+                ax.set_zlabel(zz)
+
+            plt.tight_layout()
+        else:                
+            fig, ax = plt.subplots(figsize=(12, 6))
+                    
+            if graf == "Scatter Plot":
+                ax.scatter(df[xx], df[yy], alpha=0.6)
+                ax.set_xlabel(xx)
+                ax.set_ylabel(yy)
+            
+            elif graf == "Line Plot":
+                df_agg = df.groupby(xx)[yy].mean().reset_index().sort_values(by=xx)
+                ax.plot(df_agg[xx], df_agg[yy])
+                ax.set_xlabel(xx)
+                ax.set_ylabel(yy)
+                
+                shared_data['x_range'] = (df_agg[xx].min(), df_agg[xx].max())
+                shared_data['y_range'] = (df_agg[yy].min(), df_agg[yy].max())
+            
+            elif graf == "Bar Chart":
+                df.groupby(xx)[yy].mean().plot(kind='bar', ax=ax)
+                ax.set_xlabel(xx)
+                ax.set_ylabel(f"Priemer {yy}")
+
+            elif graf == "Histogram":
+                data_clean = df[xx].dropna()
+                counts, bins_edges, patches = ax.hist(data_clean, bins=bins)
+                ax.set_xlabel(xx)
+                ax.set_ylabel('Počet')
+                
+                shared_data['y_max'] = counts.max() * 1.1
+                shared_data['bin_edges'] = bins_edges
+            
+            elif graf == "Box Plot":
+                if xx:
+                    df.boxplot(column=yy, by=xx, ax=ax)
+                else:
+                    df[yy].plot(kind='box', ax=ax)
+
+            elif graf == "Pie Chart":
+                df[xx].value_counts().plot(kind='pie', ax=ax)
+                ax.set_ylabel('')
+
+            plt.tight_layout()
+    
+    elif kniznica == "Seaborn":
+        fig, ax = plt.subplots(figsize=(12, 6))
+
+        if graf == "Scatter Plot":
+            sns.scatterplot(data=df, x=xx, y=yy, ax=ax)
+
+        elif graf == "Line Plot":
+            df_agg = df.groupby(xx)[yy].mean().reset_index().sort_values(by=xx)
+            sns.lineplot(data=df_agg, x=xx, y=yy, ax=ax)
+            
+            shared_data['y_range'] = (df_agg[yy].min(), df_agg[yy].max())
+        
+        elif graf == "Bar Chart":
+            df_grouped = df.groupby(xx)[yy].mean().reset_index()
+            ax.bar(df_grouped[xx], df_grouped[yy], edgecolor='black')
+            ax.set_xlabel(xx)
+            ax.set_ylabel(f"Priemer {yy}")
+            plt.xticks(rotation=45)
+
+        elif graf == "Histogram":
+            data_clean = df[xx].dropna()
+            min_val = data_clean.min()
+            max_val = data_clean.max()
+            bin_edges = np.linspace(min_val, max_val, bins + 1)
+            counts, _, patches = ax.hist(data_clean, bins=bin_edges, edgecolor='black')
+            ax.set_xlabel(xx)
+            ax.set_ylabel('Počet')
+            
+            shared_data['bin_edges'] = bin_edges
+        
+        elif graf == "Box Plot":
+            sns.boxplot(data=df, x=xx, y=yy, ax=ax)
+
+        elif graf == "Heatmap":
+            if sltp:
+                corr = df[sltp].corr()
+                sns.heatmap(corr, annot=True, center=0, ax=ax)
+
+        plt.tight_layout()
+    
+    elif kniznica == "Plotly":
+        if graf == "Scatter Plot":
+            fig = px.scatter(df, x=xx, y=yy)
+        
+        elif graf == "Line Plot":
+            df_agg = df.groupby(xx)[yy].mean().reset_index().sort_values(by=xx)
+            fig = px.line(df_agg, x=xx, y=yy, markers=True)
+
+        elif graf == "Bar Chart":
+            df_grouped = df.groupby(xx)[yy].mean().reset_index()
+            fig = px.bar(df_grouped, x=xx, y=yy, labels={yy: f"Priemer {yy}"}, text=yy)
+            fig.update_traces(texttemplate='%{text:.2f}', textposition='outside')
+            fig.update_layout(xaxis_title=xx, yaxis_title=f"Priemer {yy}")
+
+        elif graf == "Histogram":
+            data_clean = df[xx].dropna()
+            min_val = float(data_clean.min())
+            max_val = float(data_clean.max())
+            bin_width = (max_val - min_val) / bins
+            
+            fig = px.histogram(df, x=xx, nbins=bins, range_x=[min_val, max_val])
+            fig.update_layout(xaxis_title=xx, yaxis_title='Počet', bargap=0.1)
+            fig.update_traces(xbins=dict(start=min_val, end=max_val, size=bin_width))
+            
+            if 'y_max' in shared_data:
+                fig.update_yaxes(range=[0, shared_data['y_max']])
+        
+        elif graf == "Box Plot":
+            fig = px.box(df, x=xx, y=yy)
+        
+        elif graf == "Heatmap":
+            if sltp:
+                corr = df[sltp].corr()
+                fig = px.imshow(corr, aspect="auto")
+        
+        elif graf == "Pie Chart":
+            hodnoty = df[xx].value_counts()
+            fig = px.pie(values=hodnoty.values, names=hodnoty.index)
+        
+        elif graf == "3D Wireframe Plot":
+            xi = np.linspace(df[xx].min(), df[xx].max(), rozlisenie)
+            yi = np.linspace(df[yy].min(), df[yy].max(), rozlisenie)
+            X, Y = np.meshgrid(xi, yi)
+            
+            points = np.column_stack((df[xx], df[yy]))
+            values = df[zz]
+            grid_points = np.column_stack((X.ravel(), Y.ravel()))
+            Z = griddata(points, values, grid_points, method='cubic').reshape(X.shape)
+            
+            fig = go.Figure(data=[go.Surface(
+                x=X, y=Y, z=Z,
+                colorscale='Viridis',
+                showscale=True,
+                contours=dict(
+                    z=dict(show=True, usecolormap=True, highlightcolor="limegreen", project=dict(z=True))
+                )
+            )])
+            fig.update_layout(
+                scene=dict(xaxis_title=xx, yaxis_title=yy, zaxis_title=zz),
+                height=600
+            )
+
+        elif graf == "3D Surface Plot":
+            if zz:
+                df_pivot = df.pivot_table(values=zz, index=yy, columns=xx, aggfunc='mean')
+                fig = go.Figure(data=[go.Surface(
+                    x=df_pivot.columns,
+                    y=df_pivot.index,
+                    z=df_pivot.values
+                )])
+                fig.update_layout(
+                    title=f"3D Surface Plot",
+                    scene=dict(xaxis_title=xx, yaxis_title=yy, zaxis_title=zz)
+                )
+    
+    elif kniznica == "Bokeh":
+        fig = figure(width=800, height=400, title=graf)
+        
+        if graf == "Scatter Plot":
+            fig.scatter(df[xx].values, df[yy].values, size=8, alpha=0.6)
+        
+        elif graf == "Line Plot":
+            df_sorted = df.groupby(xx)[yy].mean().reset_index().sort_values(by=xx)
+            
+            if 'x_range' in shared_data and 'y_range' in shared_data:
+                x_min, x_max = shared_data['x_range']
+                y_min, y_max = shared_data['y_range']
+                x_padding = (x_max - x_min) * 0.05
+                y_padding = (y_max - y_min) * 0.05
+                fig = figure(width=800, height=400, title=graf, 
+                           x_range=(x_min - x_padding, x_max + x_padding),
+                           y_range=(y_min - y_padding, y_max + y_padding))
+            
+            fig.line(df_sorted[xx].values, df_sorted[yy].values, line_width=2)
+        
+        elif graf == "Bar Chart":
+            grouped = df.groupby(xx)[yy].mean()
+            fig.vbar(x=list(range(len(grouped))), top=grouped.values, width=0.8)
+            fig.xaxis.ticker = list(range(len(grouped)))
+
+        elif graf == "Histogram":
+            hist, edges = np.histogram(df[xx].dropna(), bins=bins)
+            fig.quad(top=hist, bottom=0, left=edges[:-1], right=edges[1:], alpha=0.7)
+        
+        fig.xaxis.axis_label = xx if xx else ""
+        fig.yaxis.axis_label = yy if yy else ""
+    
+    elif kniznica == "Altair":
+        if graf == "Scatter Plot":
+            fig = alt.Chart(df).mark_circle(size=60, opacity=0.6).encode(
+                x=alt.X(f'{xx}:Q', title=xx, scale=alt.Scale(zero=False)),
+                y=alt.Y(f'{yy}:Q', title=yy, scale=alt.Scale(zero=False)),
+                tooltip=[xx, yy]
+            ).interactive()
+
+        elif graf == "Line Plot":
+            df_agg = df.groupby(xx)[yy].mean().reset_index().sort_values(by=xx)
+            
+            # Ak nemáme zdieľané dáta, vypočítaj ich teraz
+            if 'y_range' not in shared_data:
+                shared_data['y_range'] = (df_agg[yy].min(), df_agg[yy].max())
+            
+            y_min, y_max = shared_data['y_range']
+            y_padding = (y_max - y_min) * 0.1
+            
+            fig = alt.Chart(df_agg).mark_line(point=True).encode(
+                x=alt.X(xx, title=xx),
+                y=alt.Y(yy, title=yy, scale=alt.Scale(domain=[y_min - y_padding, y_max + y_padding])),
+                tooltip=[xx, yy]
+            ).interactive()
+
+        elif graf == "Bar Chart":
+            fig = alt.Chart(df).mark_bar().encode(
+                x=alt.X(xx, title=xx),          
+                y=alt.Y(f'mean({yy})', title=f"Priemer {yy}"), 
+                tooltip=[xx, f'mean({yy})']
+            ).interactive()
+        
+        elif graf == "Histogram":
+            data_clean = df[xx].dropna()
+            min_val = float(data_clean.min())
+            max_val = float(data_clean.max())
+            bin_width = (max_val - min_val) / bins
+            
+            fig = alt.Chart(df).mark_bar().encode(
+                alt.X(f'{xx}:Q', 
+                    bin=alt.Bin(step=bin_width, extent=[min_val, max_val]),
+                    title=xx),
+                y=alt.Y('count()', title='Počet'),
+            ).interactive()
+        
+        elif graf == "Box Plot":
+            fig = alt.Chart(df).mark_boxplot().encode(
+                x=alt.X(f'{xx}:N', title=xx) if xx else alt.value(0),
+                y=alt.Y(f'{yy}:Q', title=yy)
+            )
+        
+        fig = fig.properties(width=800, height=400)
+    
+    return fig, shared_data
+
+
+def display_chart(fig, kniznica):
+    """Zobrazí graf podľa typu knižnice"""
+    if kniznica in ["Matplotlib", "Seaborn"]:
+        st.pyplot(fig)
+    elif kniznica == "Plotly":
+        st.plotly_chart(fig, use_container_width=True)
+    elif kniznica == "Altair":
+        st.altair_chart(fig, use_container_width=True)
+    elif kniznica == "Bokeh":
+        st.bokeh_chart(fig, use_container_width=True)
 
 # konfiguracia stranky
 st.set_page_config(page_title="Vizualizačný Dashboard", layout="wide", initial_sidebar_state="collapsed")
@@ -532,6 +825,22 @@ if subor is not None:
 
             elif len(kniznice) == 2 and set(kniznice) == {"Altair", "Bokeh"}:
                 dostupne_grafy = ["Scatter Plot", "Line Plot", "Bar Chart", "Histogram"]
+            
+            elif len(kniznice) >= 2:
+                # spolocne grafy pre vsetky vybrane kniznice
+                dostupne_pre_kniznice = {
+                    "Matplotlib": ["Scatter Plot", "Line Plot", "Bar Chart", "Histogram", "Box Plot", "Pie Chart", "3D Surface Plot", "3D Wireframe Plot"],
+                    "Seaborn": ["Scatter Plot", "Line Plot", "Bar Chart", "Histogram", "Box Plot", "Heatmap"],
+                    "Plotly": ["Scatter Plot", "Line Plot", "Bar Chart", "Histogram", "Box Plot", "Heatmap", "Pie Chart", "3D Surface Plot", "3D Wireframe Plot"],
+                    "Bokeh": ["Scatter Plot", "Line Plot", "Bar Chart", "Histogram"],
+                    "Altair": ["Scatter Plot", "Line Plot", "Bar Chart", "Histogram", "Box Plot"]
+                }
+                # priesecnik grafy podporovane vsetkymi vybranymi kniznicami
+                dostupne_grafy = set(dostupne_pre_kniznice[kniznice[0]])
+                for kniznica in kniznice[1:]:
+                    dostupne_grafy = dostupne_grafy.intersection(set(dostupne_pre_kniznice[kniznica]))
+                
+                dostupne_grafy = sorted(list(dostupne_grafy))
             else:
                 dostupne_grafy = ["Scatter Plot", "Line Plot", "Bar Chart", "Histogram", "Box Plot"]
             
@@ -540,6 +849,11 @@ if subor is not None:
                 dostupne_grafy, key="prvg"
             )
         
+            bins = None
+            sltp = None
+            zz = None
+            rozlisenie = 100
+
             # vyber premennych
             if graf in ["Scatter Plot", "Line Plot"]:
                 stl1, stl2 = st.columns(2)
@@ -567,15 +881,15 @@ if subor is not None:
                     xx = None if xx == "Žiadna" else xx
                 with stl2:
                     yy = st.selectbox("Hodnota:", numericke if numericke else sltpce, key="porvy")
-            
+
             elif graf == "Heatmap":
                 sltp = st.multiselect("Vyberte premenné:", numericke, default=numericke[:5] if len(numericke) >= 5 else numericke, key="prhx")
                 xx = yy = None
-            
+
             elif graf == "Pie Chart":
                 xx = st.selectbox("Kategória:", kategorialne if kategorialne else sltpce, key="prpcx")
                 yy = None
-            
+
             elif graf in ["3D Surface Plot", "3D Wireframe Plot"]:
                 stl1, stl2, stl3 = st.columns(3)
                 with stl1:
@@ -587,7 +901,7 @@ if subor is not None:
                 
                 rozlisenie = st.slider("Rozlíšenie grafu:", 20, 200, 100, step=10, key="prvbin",
                                     help="Vyššie rozlíšenie = hladší graf, ale pomalší výpočet")
-            
+                
             if st.button(" Porovnať knižnice", use_container_width=True, key="prvgenerovanie"):
                 if len(kniznice) < 2:
                     st.warning("Vyberte aspoň 2 knižnice na porovnanie")
@@ -1546,5 +1860,40 @@ if subor is not None:
                                             y=alt.Y('count()', title='Počet'),
                                         ).interactive()
                                     st.altair_chart(fig, use_container_width=True)
+                                    
+                        else:  # 3 alebo viac kniznic
+                            st.info(f"Porovnávate {len(kniznice)} knižníc")
+                            # vytvori stlpce dynamicky podla poctu kniznic
+                            cols = st.columns(len(kniznice))
+                            # zdielanie dat pre synchronizaciu grafov
+                            shared_data = {}
+                            # prejde vsetky vybrane knižzice
+                            for idx, kniznica in enumerate(kniznice):
+                                with cols[idx]:
+                                    st.markdown(f"### {kniznica}")
+                                    
+                                    try:
+                                        # vygeneruje graf pomocou univerzalnej funkcie
+                                        fig, chart_shared_data = generate_chart(
+                                            kniznica=kniznica,
+                                            graf=graf,
+                                            df=df,
+                                            xx=xx,
+                                            yy=yy,
+                                            bins=bins,
+                                            sltp=sltp,
+                                            zz=zz,
+                                            rozlisenie=rozlisenie 
+                                        )
+                                        
+                                        # aktualizuje zdielane data (prvy graf nastavi rozsahy)
+                                        if idx == 0:
+                                            shared_data.update(chart_shared_data)
+                        
+                                        # zobrazi graf
+                                        display_chart(fig, kniznica)
+                                        
+                                    except Exception as e:
+                                        st.error(f"Chyba pri generovaní {kniznica}: {str(e)}")
     except Exception as e:
         st.error(f" Chyba pri načítaní súboru: {str(e)}")
