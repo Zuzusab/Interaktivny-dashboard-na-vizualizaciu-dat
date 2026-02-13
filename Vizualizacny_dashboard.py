@@ -936,6 +936,7 @@ if subor is not None:
                                 
                                     if graf == "3D Surface Plot":
                                         data_clean = df[[xx, yy, zz]].dropna()
+                                
                                         xi = np.linspace(data_clean[xx].min(), data_clean[xx].max(), 50)
                                         yi = np.linspace(data_clean[yy].min(), data_clean[yy].max(), 50)
                                         XI, YI = np.meshgrid(xi, yi)
@@ -948,17 +949,19 @@ if subor is not None:
                                         ax.set_zlabel(zz)
 
                                     elif graf == "3D Wireframe Plot":
+                                        # Vytvori mriežku
                                         xi = np.linspace(df[xx].min(), df[xx].max(), rozlisenie)
                                         yi = np.linspace(df[yy].min(), df[yy].max(), rozlisenie)
                                         X, Y = np.meshgrid(xi, yi)
                                         
-                                        # Oprava interpolácie
+                                        # Interpoluje Z hodnoty
                                         points = np.column_stack((df[xx], df[yy]))
                                         values = df[zz]
                                         grid_points = np.column_stack((X.ravel(), Y.ravel()))
                                         Z = griddata(points, values, grid_points, method='cubic').reshape(X.shape)
                                         
-                                        ax.plot_wireframe(X, Y, Z, color='darkblue', alpha=0.6, linewidth=0.5)
+                                        # Vykresli wireframe
+                                        ax.plot_wireframe(X, Y, Z, color='darkblue', alpha=0.6, linewidth=0.5, rstride=5, cstride=5)
                                         ax.set_xlabel(xx)
                                         ax.set_ylabel(yy)
                                         ax.set_zlabel(zz)
@@ -981,9 +984,14 @@ if subor is not None:
                                         ax.set_ylabel(yy)
                                     
                                     elif graf == "Bar Chart":
-                                        df.groupby(xx)[yy].mean().plot(kind='bar', ax=ax)
+                                        df_grouped = df.groupby(xx)[yy].mean()
+                                        df_grouped.plot(kind='bar', ax=ax)
                                         ax.set_xlabel(xx)
                                         ax.set_ylabel(f"Priemer {yy}")
+                                        
+                                        # Ulož rozsah Y osi pre synchronizáciu
+                                        y_max_bar = df_grouped.max() * 1.1
+                                        ax.set_ylim(0, y_max_bar)
 
                                     elif graf == "Histogram":
                                         data_clean = df[xx].dropna()
@@ -1019,7 +1027,14 @@ if subor is not None:
                                     fig = px.line(df_agg, x=xx, y=yy, markers=True)
                                 
                                 elif graf == "Bar Chart":
-                                    fig = px.bar(df, x=xx, y=yy)
+                                    df_grouped = df.groupby(xx)[yy].mean().reset_index()
+                                    fig = px.bar(df_grouped, x=xx, y=yy, labels={yy: f"Priemer {yy}"}, text=yy)
+                                    fig.update_traces(texttemplate='%{text:.2f}', textposition='outside')
+                                    fig.update_layout(xaxis_title=xx, yaxis_title=f"Priemer {yy}")
+                                    
+                                    # Synchronizuj Y os s Matplotlib
+                                    if 'y_max_bar' in locals():
+                                        fig.update_yaxes(range=[0, y_max_bar])
                                 
                                 elif graf == "Histogram":
                                     data_clean = df[xx].dropna()
@@ -1037,41 +1052,51 @@ if subor is not None:
                                     fig = px.pie(values=hodnoty.values, names=hodnoty.index)
                                 
                                 elif graf == "3D Wireframe Plot":
+                                    # Vytvori mriežku
                                     xi = np.linspace(df[xx].min(), df[xx].max(), rozlisenie)
                                     yi = np.linspace(df[yy].min(), df[yy].max(), rozlisenie)
                                     X, Y = np.meshgrid(xi, yi)
                                     
-                                    # Oprava interpolácie
+                                    # Interpoluje Z hodnoty
                                     points = np.column_stack((df[xx], df[yy]))
                                     values = df[zz]
                                     grid_points = np.column_stack((X.ravel(), Y.ravel()))
                                     Z = griddata(points, values, grid_points, method='cubic').reshape(X.shape)
                                     
+                                    # Vykresli wireframe v Plotly
                                     fig = go.Figure(data=[go.Surface(
                                         x=X, y=Y, z=Z,
                                         colorscale='Viridis',
                                         showscale=True,
+                                        surfacecolor=Z,
+                                        opacity=0.9,
                                         contours=dict(
-                                            z=dict(show=True, usecolormap=True, highlightcolor="limegreen", project=dict(z=True))
+                                            x=dict(show=True, color="darkblue", width=1),
+                                            y=dict(show=True, color="darkblue", width=1),
+                                            z=dict(show=False)
                                         )
                                     )])
+                                    fig.update_layout(
+                                        scene=dict(xaxis_title=xx, yaxis_title=yy, zaxis_title=zz),
+                                        height=600
+                                    )
                                 
                                 elif graf == "3D Surface Plot":
                                     if zz:
-                                        df_pivot = df.pivot_table(values=zz, index=yy, columns=xx, aggfunc='mean')
-                                        fig = go.Figure(data=[go.Surface(
-                                            x=df_pivot.columns,
-                                            y=df_pivot.index,
-                                            z=df_pivot.values
-                                        )])
+                                        data_clean = df[[xx, yy, zz]].dropna()
+                                        xi = np.linspace(data_clean[xx].min(), data_clean[xx].max(), 50)
+                                        yi = np.linspace(data_clean[yy].min(), data_clean[yy].max(), 50)
+                                        XI, YI = np.meshgrid(xi, yi)
+                                        ZI = griddata((data_clean[xx], data_clean[yy]), data_clean[zz], (XI, YI), method='cubic')
+                                        
+                                        fig = go.Figure(data=[go.Surface(x=XI, y=YI, z=ZI, colorscale='Viridis')])
                                         fig.update_layout(
-                                            title=f"3D Surface Plot",
-                                            scene=dict(xaxis_title=xx, yaxis_title=yy, zaxis_title=zz)
+                                            scene=dict(xaxis_title=xx, yaxis_title=yy, zaxis_title=zz),
+                                            height=600
                                         )
                                     else:
                                         st.warning("Pre 3D Surface Plot musíte vybrať Z os!")
-                                plt.tight_layout()
-                                st.pyplot(fig)
+                                st.plotly_chart(fig, use_container_width=True)
                             
                         elif (len(kniznice) == 2 and set(kniznice) == {"Matplotlib", "Seaborn"}):
                             
@@ -1262,6 +1287,15 @@ if subor is not None:
                                     ax.set_xlabel(xx)
                                     ax.set_ylabel(yy)
                                     
+                                    # nastavi rozsahy osi
+                                    x_min, x_max = df[xx].min(), df[xx].max()
+                                    y_min, y_max = df[yy].min(), df[yy].max()
+                                    x_padding = (x_max - x_min) * 0.05
+                                    y_padding = (y_max - y_min) * 0.05
+                                    
+                                    ax.set_xlim([x_min - x_padding, x_max + x_padding])
+                                    ax.set_ylim([y_min - y_padding, y_max + y_padding])
+                                    
                                 elif graf == "Line Plot":
                                     df_agg = df.groupby(xx)[yy].mean().reset_index().sort_values(by=xx)
                                     ax.plot(df_agg[xx], df_agg[yy])
@@ -1296,13 +1330,39 @@ if subor is not None:
                             with stl_atlair:
                                 st.markdown("### Altair")  
                                 if graf == "Scatter Plot":
-                                    fig = alt.Chart(df).mark_circle(size=60).encode(
-                                        x=xx, y=yy, tooltip=[xx, yy]
+                                    # ziska rozsahy osí z Matplotlib (ak existujú)
+                                    x_min, x_max = df[xx].min(), df[xx].max()
+                                    y_min, y_max = df[yy].min(), df[yy].max()
+                                    
+                                    # prida padding
+                                    x_padding = (x_max - x_min) * 0.05
+                                    y_padding = (y_max - y_min) * 0.05
+                                    
+                                    fig = alt.Chart(df).mark_circle(size=60, opacity=0.6).encode(
+                                        x=alt.X(f'{xx}:Q', title=xx, 
+                                                scale=alt.Scale(domain=[x_min - x_padding, x_max + x_padding])),
+                                        y=alt.Y(f'{yy}:Q', title=yy, 
+                                                scale=alt.Scale(domain=[y_min - y_padding, y_max + y_padding])),
+                                        tooltip=[xx, yy]
                                     ).interactive()
 
-                                elif graf == "Line Plot":
-                                    fig = alt.Chart(df).mark_line().encode(
-                                        x=xx, y=yy, tooltip=[xx, yy]
+                                if graf == "Line Plot":
+                                    # agreguje data rovnako ako Matplotlib
+                                    df_agg = df.groupby(xx)[yy].mean().reset_index().sort_values(by=xx)
+                                    
+                                    # ak su zdielana rozsahy Y osi z Matplotlib
+                                    if 'y_range' in locals():
+                                        y_min, y_max = y_range
+                                    else:
+                                        y_min = df_agg[yy].min()
+                                        y_max = df_agg[yy].max()
+                                    
+                                    y_padding = (y_max - y_min) * 0.1
+                                    
+                                    fig = alt.Chart(df_agg).mark_line(point=True).encode(
+                                        x=alt.X(xx, title=xx),
+                                        y=alt.Y(yy, title=yy, scale=alt.Scale(domain=[y_min - y_padding, y_max + y_padding])),
+                                        tooltip=[xx, yy]
                                     ).interactive()
 
                                 elif graf == "Bar Chart":
@@ -1378,8 +1438,16 @@ if subor is not None:
                                 elif graf == "Box Plot":
                                     sns.boxplot(data=df, x=xx, y=yy, ax=ax)
 
-                                plt.tight_layout()
-                                st.pyplot(fig)
+                                elif graf == "Heatmap":
+                                    corr = df.corr(numeric_only=True)
+                                    plt.figure(figsize=(10, 6))
+                                    sns.heatmap(
+                                        corr,
+                                        annot=True,
+                                        cmap="viridis"
+                                    )
+
+                                st.pyplot(plt)
 
                             with stl_plotly:
                                 st.markdown("### Plotly")
@@ -1417,6 +1485,14 @@ if subor is not None:
                                 
                                 elif graf == "Box Plot":
                                     fig = px.box(df, x=xx, y=yy)
+
+                                elif graf == "Heatmap":
+                                    corr = df.corr(numeric_only=True)
+                                    fig = px.imshow(
+                                        corr,
+                                        text_auto=True,
+                                        color_continuous_scale="Viridis"
+                                    )
 
                                 st.plotly_chart(fig, use_container_width=True)
                         elif (len(kniznice) == 2 and set(kniznice) == {"Seaborn", "Bokeh"}):
