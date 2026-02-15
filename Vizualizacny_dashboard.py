@@ -826,7 +826,7 @@ if subor is not None:
             elif len(kniznice) == 2 and set(kniznice) == {"Altair", "Bokeh"}:
                 dostupne_grafy = ["Scatter Plot", "Line Plot", "Bar Chart", "Histogram"]
             
-            elif len(kniznice) >= 2:
+            elif len(kniznice) >= 3:
                 # spolocne grafy pre vsetky vybrane kniznice
                 dostupne_pre_kniznice = {
                     "Matplotlib": ["Scatter Plot", "Line Plot", "Bar Chart", "Histogram", "Box Plot", "Pie Chart", "3D Surface Plot", "3D Wireframe Plot"],
@@ -840,7 +840,11 @@ if subor is not None:
                 for kniznica in kniznice[1:]:
                     dostupne_grafy = dostupne_grafy.intersection(set(dostupne_pre_kniznice[kniznica]))
                 
-                dostupne_grafy = sorted(list(dostupne_grafy))
+                prioritne_poradie = ["Scatter Plot", "Line Plot", "Bar Chart", "Histogram", 
+                     "Box Plot", "Heatmap", "Pie Chart", 
+                     "3D Surface Plot", "3D Wireframe Plot"]
+
+                dostupne_grafy = [g for g in prioritne_poradie if g in dostupne_grafy]
             else:
                 dostupne_grafy = ["Scatter Plot", "Line Plot", "Bar Chart", "Histogram", "Box Plot"]
             
@@ -1937,8 +1941,7 @@ if subor is not None:
                                         ).interactive()
                                     st.altair_chart(fig, use_container_width=True)
                                     
-                        else:  # 3 alebo viac kniznic
-                            st.info(f"Porovnávate {len(kniznice)} knižníc")
+                        else:  
                             # vytvori stlpce dynamicky podla poctu kniznic
                             cols = st.columns(len(kniznice))
                             # zdielanie dat pre synchronizaciu grafov
