@@ -1,4 +1,5 @@
 import streamlit as st
+import kaleido
 import pandas as pd
 import numpy as np
 # Dočasný fix pre Bokeh kompatibilitu
@@ -17,7 +18,7 @@ import altair as alt
 import io
 import base64
 from scipy.interpolate import griddata
-import kaleido
+import vl_convert as vlc
 
 def generate_chart(kniznica, graf, df, xx, yy, bins=None, sltp=None, zz=None, rozlisenie=100):
 
@@ -300,7 +301,8 @@ def generate_chart(kniznica, graf, df, xx, yy, bins=None, sltp=None, zz=None, ro
         fig = fig.properties(width=800, height=400)
     
     return fig, shared_data
-
+PLOTLY_COLORS = ['#636efa','#ef553b','#00cc96','#ab63fa','#ffa15a',
+                 '#19d3f3','#ff6692','#b6e880','#ff97ff','#fecb52']
 
 def display_chart(fig, kniznica):
     """Zobrazí graf podľa typu knižnice"""
@@ -344,42 +346,46 @@ def stiahnut_graf(fig, kniznica, format_suboru, nazov_grafu="graf"):
         
                 
         elif kniznica == "Plotly":
-            # Plotly podporuje: PNG, PDF, HTML, SVG
             if format_suboru == "HTML":
                 html_str = fig.to_html()
                 buffer.write(html_str.encode())
             elif format_suboru == "PNG":
-                buffer = io.BytesIO(fig.to_image(format="png"))
+                buffer = io.BytesIO(fig.to_image(format="png", engine="kaleido"))
             elif format_suboru == "PDF":
-                buffer = io.BytesIO(fig.to_image(format="pdf"))
+                buffer = io.BytesIO(fig.to_image(format="pdf", engine="kaleido"))
             elif format_suboru == "SVG":
-                buffer = io.BytesIO(fig.to_image(format="svg"))
+                buffer = io.BytesIO(fig.to_image(format="svg", engine="kaleido"))
                 
         elif kniznica == "Altair":
-            # Altair podporuje: PNG, SVG, HTML, JSON
             if format_suboru == "HTML":
                 html_str = fig.to_html()
                 buffer.write(html_str.encode())
             elif format_suboru == "PNG":
-                png_data = fig.to_image(format='png')
-                buffer.write(png_data)
+                try:
+                    png_data = vlc.vegalite_to_png(fig.to_json())
+                    buffer.write(png_data)
+                except ImportError:
+                    st.error("Nainštaluj vl-convert: pip install vl-convert-python")
+                    return None
             elif format_suboru == "SVG":
-                svg_str = fig.to_image(format='svg')
-                buffer.write(svg_str)
+                try:
+                    svg_str = vlc.vegalite_to_svg(fig.to_json())
+                    buffer.write(svg_str.encode())
+                except ImportError:
+                    st.error("Nainštaluj vl-convert: pip install vl-convert-python")
+                    return None
             elif format_suboru == "JSON":
                 json_str = fig.to_json()
                 buffer.write(json_str.encode())
                 
         elif kniznica == "Bokeh":
-            # Bokeh podporuje: PNG, HTML
             from bokeh.io import export_png
             if format_suboru == "HTML":
                 from bokeh.embed import file_html
                 from bokeh.resources import CDN
                 html_str = file_html(fig, CDN, nazov_grafu)
                 buffer.write(html_str.encode())
-            elif format_suboru == "PNG":
-                export_png(fig, filename=buffer)
+            
         
         buffer.seek(0)
         return buffer
@@ -391,7 +397,7 @@ Podporovane_formaty = {
     "Matplotlib": ["PNG", "PDF", "SVG"],
     "Seaborn": ["PNG", "PDF", "SVG"],
     "Plotly": ["HTML", "PNG", "PDF", "SVG"],
-    "Bokeh": ["HTML", "PNG"],
+    "Bokeh": ["HTML"],
     "Altair": ["HTML", "PNG", "SVG", "JSON"]
 }
 
@@ -624,66 +630,139 @@ if subor is not None:
                     elif kniznica == "Plotly":
                         if graf == "Scatter Plot":
                             fig = px.scatter(df, x=xx, y=yy)
-                        
+                            fig_mpl, ax_mpl = plt.subplots(figsize=(12,7), facecolor='white')
+                            ax_mpl.scatter(df[xx], df[yy], alpha=0.6, color=PLOTLY_COLORS[0])
+                            ax_mpl.set_xlabel(xx); ax_mpl.set_ylabel(yy)
+                            ax_mpl.set_facecolor('white')
+                            plt.tight_layout()
+                            st.session_state.fig_mpl = fig_mpl
+                            plt.close(fig_mpl)
+
                         elif graf == "Line Plot":
                             df_agg = df.groupby(xx)[yy].mean().reset_index().sort_values(by=xx)
                             fig = px.line(df_agg, x=xx, y=yy, markers=True)
+                            fig_mpl, ax_mpl = plt.subplots(figsize=(12,7), facecolor='white')
+                            ax_mpl.plot(df_agg[xx], df_agg[yy], color=PLOTLY_COLORS[0], marker='o', linewidth=2)
+                            ax_mpl.set_xlabel(xx); ax_mpl.set_ylabel(yy)
+                            ax_mpl.set_facecolor('white')
+                            plt.tight_layout()
+                            st.session_state.fig_mpl = fig_mpl
+                            plt.close(fig_mpl)
 
                         elif graf == "Bar Chart":
-                            fig = px.bar(df, x=xx, y=yy)
+                            df_grouped = df.groupby(xx)[yy].mean().reset_index()
+                            fig = px.bar(df_grouped, x=xx, y=yy, labels={yy: f"Priemer {yy}"}, text=yy)
+                            fig.update_traces(texttemplate='%{text:.2f}', textposition='outside')
+                            fig.update_layout(xaxis_title=xx, yaxis_title=f"Priemer {yy}")
+                            fig_mpl, ax_mpl = plt.subplots(figsize=(12,7), facecolor='white')
+                            bars = ax_mpl.bar(df_grouped[xx], df_grouped[yy], alpha=0.85)
+                            for j, bar in enumerate(bars):
+                                bar.set_facecolor(PLOTLY_COLORS[j % len(PLOTLY_COLORS)])
+                            ax_mpl.set_xlabel(xx); ax_mpl.set_ylabel(f"Priemer {yy}")
+                            plt.xticks(rotation=45, ha='right')
+                            ax_mpl.set_facecolor('white')
+                            plt.tight_layout()
+                            st.session_state.fig_mpl = fig_mpl
+                            plt.close(fig_mpl)
 
                         elif graf == "Histogram":
-                            fig = px.histogram(df, x=xx, nbins=bins)
-                        
+                            data_clean = df[xx].dropna()
+                            min_val = float(data_clean.min())
+                            max_val = float(data_clean.max())
+                            bin_width = (max_val - min_val) / bins
+                            fig = px.histogram(df, x=xx, nbins=bins, range_x=[min_val, max_val])
+                            fig.update_layout(xaxis_title=xx, yaxis_title='Počet', bargap=0.1)
+                            fig.update_traces(xbins=dict(start=min_val, end=max_val, size=bin_width))
+                            fig_mpl, ax_mpl = plt.subplots(figsize=(12,7), facecolor='white')
+                            ax_mpl.hist(data_clean, bins=bins, color=PLOTLY_COLORS[0], alpha=0.75, edgecolor='white')
+                            ax_mpl.set_xlabel(xx); ax_mpl.set_ylabel('Počet')
+                            ax_mpl.set_facecolor('white')
+                            plt.tight_layout()
+                            st.session_state.fig_mpl = fig_mpl
+                            plt.close(fig_mpl)
+
                         elif graf == "Box Plot":
                             fig = px.box(df, x=xx, y=yy)
-                        
+                            fig_mpl, ax_mpl = plt.subplots(figsize=(12,7), facecolor='white')
+                            if xx:
+                                groups = df.groupby(xx)[yy].apply(list)
+                                bp = ax_mpl.boxplot(groups.values, labels=groups.index, patch_artist=True)
+                                for j, patch in enumerate(bp['boxes']):
+                                    patch.set_facecolor(PLOTLY_COLORS[j % len(PLOTLY_COLORS)])
+                                    patch.set_alpha(0.7)
+                            else:
+                                ax_mpl.boxplot(df[yy].dropna(), patch_artist=True)
+                            ax_mpl.set_facecolor('white')
+                            plt.tight_layout()
+                            st.session_state.fig_mpl = fig_mpl
+                            plt.close(fig_mpl)
+
                         elif graf == "Heatmap":
                             if sltp:
                                 corr = df[sltp].corr()
                                 fig = px.imshow(corr, aspect="auto")
-                        
+                                fig_mpl, ax_mpl = plt.subplots(figsize=(12,7), facecolor='white')
+                                im = ax_mpl.imshow(corr.values, cmap='RdBu_r', aspect='auto', vmin=-1, vmax=1)
+                                plt.colorbar(im, ax=ax_mpl)
+                                ax_mpl.set_xticks(range(len(corr.columns)))
+                                ax_mpl.set_xticklabels(corr.columns, rotation=45, ha='right')
+                                ax_mpl.set_yticks(range(len(corr.index)))
+                                ax_mpl.set_yticklabels(corr.index)
+                                ax_mpl.set_facecolor('white')
+                                plt.tight_layout()
+                                st.session_state.fig_mpl = fig_mpl
+                                plt.close(fig_mpl)
+
                         elif graf == "Pie Chart":
                             hodnoty = df[xx].value_counts()
                             fig = px.pie(values=hodnoty.values, names=hodnoty.index)
-                        
+                            fig_mpl, ax_mpl = plt.subplots(figsize=(10,7), facecolor='white')
+                            ax_mpl.pie(hodnoty.values, labels=hodnoty.index, autopct='%1.1f%%',
+                                    colors=PLOTLY_COLORS[:len(hodnoty)])
+                            ax_mpl.axis('equal')
+                            ax_mpl.set_facecolor('white')
+                            plt.tight_layout()
+                            st.session_state.fig_mpl = fig_mpl
+                            plt.close(fig_mpl)
+
                         elif graf == "3D Wireframe Plot":
                             xi = np.linspace(df[xx].min(), df[xx].max(), rozlisenie)
                             yi = np.linspace(df[yy].min(), df[yy].max(), rozlisenie)
                             X, Y = np.meshgrid(xi, yi)
-                            Z = griddata((df[xx], df[yy]), df[zz], (X, Y), method='cubic')
-                            
+                            points = np.column_stack((df[xx], df[yy]))
+                            values = df[zz]
+                            grid_points = np.column_stack((X.ravel(), Y.ravel()))
+                            Z = griddata(points, values, grid_points, method='cubic').reshape(X.shape)
                             fig = go.Figure(data=[go.Surface(
-                                x=X, y=Y, z=Z,
-                                colorscale='Viridis',
-                                showscale=True,
-                                contours=dict(
-                                    z=dict(show=True, usecolormap=True, highlightcolor="limegreen", project=dict(z=True))
-                                )
+                                x=X, y=Y, z=Z, colorscale='Viridis', showscale=True,
+                                contours=dict(z=dict(show=True, usecolormap=True, highlightcolor="limegreen", project=dict(z=True)))
                             )])
-                            fig.update_layout(
-                                scene=dict(
-                                    xaxis_title=xx,
-                                    yaxis_title=yy,
-                                    zaxis_title=zz
-                                ),
-                                height=600
-                            )
+                            fig.update_layout(scene=dict(xaxis_title=xx, yaxis_title=yy, zaxis_title=zz), height=600)
+                            fig_mpl = plt.figure(figsize=(12,7), facecolor='white')
+                            ax_mpl = fig_mpl.add_subplot(111, projection='3d')
+                            ax_mpl.plot_wireframe(X, Y, Z, color='darkblue', alpha=0.6, linewidth=0.5)
+                            ax_mpl.set_xlabel(xx); ax_mpl.set_ylabel(yy); ax_mpl.set_zlabel(zz)
+                            plt.tight_layout()
+                            st.session_state.fig_mpl = fig_mpl
+                            plt.close(fig_mpl)
 
                         elif graf == "3D Surface Plot":
                             if zz:
                                 df_pivot = df.pivot_table(values=zz, index=yy, columns=xx, aggfunc='mean')
-                                fig = go.Figure(data=[go.Surface(
-                                    x=df_pivot.columns,
-                                    y=df_pivot.index,
-                                    z=df_pivot.values
-                                )])
-                                fig.update_layout(
-                                    title=f"3D Surface Plot",
-                                    scene=dict(xaxis_title=xx, yaxis_title=yy, zaxis_title=zz)
-                                )
-                            else:
-                                st.warning("Pre 3D Surface Plot musíte vybrať Z os!")
+                                fig = go.Figure(data=[go.Surface(x=df_pivot.columns, y=df_pivot.index, z=df_pivot.values)])
+                                fig.update_layout(title=f"3D Surface Plot", scene=dict(xaxis_title=xx, yaxis_title=yy, zaxis_title=zz))
+                                data_clean = df[[xx, yy, zz]].dropna()
+                                xi = np.linspace(data_clean[xx].min(), data_clean[xx].max(), 50)
+                                yi = np.linspace(data_clean[yy].min(), data_clean[yy].max(), 50)
+                                XI, YI = np.meshgrid(xi, yi)
+                                ZI = griddata((data_clean[xx], data_clean[yy]), data_clean[zz], (XI, YI), method='cubic')
+                                fig_mpl = plt.figure(figsize=(12,7), facecolor='white')
+                                ax_mpl = fig_mpl.add_subplot(111, projection='3d')
+                                surf = ax_mpl.plot_surface(XI, YI, ZI, cmap='viridis', alpha=0.9)
+                                fig_mpl.colorbar(surf, ax=ax_mpl, shrink=0.5)
+                                ax_mpl.set_xlabel(xx); ax_mpl.set_ylabel(yy); ax_mpl.set_zlabel(zz)
+                                plt.tight_layout()
+                                st.session_state.fig_mpl = fig_mpl
 
                     elif kniznica == "Bokeh":
                         fig = figure(width=800, height=400, title=graf)
@@ -749,8 +828,9 @@ if subor is not None:
             # Zobrazenie grafu ak je ready 
             if st.session_state.graf_ready and st.session_state.fig is not None:
                 st.markdown(f"### {st.session_state.graf_typ_export} - {st.session_state.kniznica_export}")
-                
-                if st.session_state.kniznica_export in ["Matplotlib", "Seaborn"]:
+                if "fig_mpl" not in st.session_state:
+                    st.session_state.fig_mpl = None
+                elif st.session_state.kniznica_export in ["Matplotlib", "Seaborn"]:
                     st.pyplot(st.session_state.fig)
                 elif st.session_state.kniznica_export == "Plotly":
                     st.plotly_chart(st.session_state.fig, use_container_width=True)
@@ -764,47 +844,80 @@ if subor is not None:
                     {script}
                     {div}
                     """, height=500)
-                
-                # Export sekcia
                 st.markdown("---")
                 st.markdown("### Export grafu")
-                
+
                 col1, col2 = st.columns([2, 1])
-                
                 with col1:
-                    format_export = st.selectbox(
-                        "Vyberte formát exportu:",
-                        Podporovane_formaty[st.session_state.kniznica_export],
-                        key="format_selectbox"
-                    )
-                
-                with col2:
-                    if st.button("Uložiť graf", use_container_width=True):
-                        buffer = stiahnut_graf(
-                            st.session_state.fig,
-                            st.session_state.kniznica_export,
-                            format_export,
-                            f"{st.session_state.graf_typ_export}_{st.session_state.kniznica_export}"
+                        format_export = st.selectbox(
+                            "Vyberte formát exportu:",
+                            Podporovane_formaty[st.session_state.kniznica_export],
+                            key="format_selectbox"
                         )
-                        
-                        if buffer:
-                            mime_types = {
-                                "PNG": "image/png",
-                                "PDF": "application/pdf",
-                                "SVG": "image/svg+xml",
-                                "HTML": "text/html",
-                                "JSON": "application/json"
+
+                if st.session_state.kniznica_export == "Plotly":
+                    if format_export == "HTML":
+                        html_str = st.session_state.fig.to_html(include_plotlyjs='cdn')
+                        st.download_button(
+                            label="⬇️ Stiahnuť HTML",
+                            data=html_str.encode(),
+                            file_name=f"{st.session_state.graf_typ_export.replace(' ', '_')}.html",
+                            mime="text/html",
+                            use_container_width=True
+                        )
+                    else:
+                        if st.session_state.fig_mpl is not None:
+                            buffer = io.BytesIO()
+                            fmt_map = {
+                                "PNG": ("png", "image/png"),
+                                "PDF": ("pdf", "application/pdf"),
+                                "SVG": ("svg", "image/svg+xml"),
                             }
-                            
+                            fmt, mime = fmt_map[format_export]
+                            st.session_state.fig_mpl.savefig(
+                                buffer, format=fmt, dpi=150,
+                                bbox_inches='tight', facecolor='white'
+                            )
+                            buffer.seek(0)
                             st.download_button(
-                                label=f"Stiahnuť ako {format_export}",
+                                label=f"⬇️ Stiahnuť {format_export}",
                                 data=buffer,
-                                file_name=f"{st.session_state.graf_typ_export.replace(' ', '_')}_{st.session_state.kniznica_export}.{format_export.lower()}",
-                                mime=mime_types.get(format_export, "application/octet-stream"),
+                                file_name=f"{st.session_state.graf_typ_export.replace(' ', '_')}.{fmt}",
+                                mime=mime,
                                 use_container_width=True
                             )
-                            st.success(f"Graf pripravený na stiahnutie vo formáte {format_export}!")
-             # Porovnávací režim                   
+                        else:
+                            st.warning("Najprv vygeneruj graf!")
+
+                else:
+                        # Matplotlib, Seaborn, Altair, Bokeh
+                        with col2:
+                            if st.button("Uložiť graf", use_container_width=True):
+                                buffer = stiahnut_graf(
+                                    st.session_state.fig,
+                                    st.session_state.kniznica_export,
+                                    format_export,
+                                    f"{st.session_state.graf_typ_export}_{st.session_state.kniznica_export}"
+                                )
+
+                                if buffer:
+                                    mime_types = {
+                                        "PNG": "image/png",
+                                        "PDF": "application/pdf",
+                                        "SVG": "image/svg+xml",
+                                        "HTML": "text/html",
+                                        "JSON": "application/json"
+                                    }
+
+                                    st.download_button(
+                                        label=f"Stiahnuť ako {format_export}",
+                                        data=buffer,
+                                        file_name=f"{st.session_state.graf_typ_export.replace(' ', '_')}_{st.session_state.kniznica_export}.{format_export.lower()}",
+                                        mime=mime_types.get(format_export, "application/octet-stream"),
+                                        use_container_width=True
+                                    )
+                                    st.success(f"Graf pripravený na stiahnutie vo formáte {format_export}!")
+         # Porovnávací režim                   
         else:  
             st.markdown("### Porovnanie vizualizačných knižníc") 
         
