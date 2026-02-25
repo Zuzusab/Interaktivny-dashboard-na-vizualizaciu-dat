@@ -629,8 +629,8 @@ if subor is not None:
                             if sltp:
                                 sltp_num = df[sltp].select_dtypes(include=['number']).columns.tolist()
                                 corr = df[sltp_num].corr()
-                                fig = px.imshow(corr, aspect="auto", text_auto=True,
-                                            color_continuous_scale="RdBu_r", zmin=-1, zmax=1)
+                                sns.heatmap(corr, annot=True, fmt=".2f", center=0,
+                                            cmap="RdBu_r", vmin=-1, vmax=1, ax=ax)
                             plt.tight_layout()
 
                     elif kniznica == "Plotly":
