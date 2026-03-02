@@ -14,15 +14,16 @@ from bokeh.embed import components
 import streamlit.components.v1 as components_st
 from mpl_toolkits.mplot3d import Axes3D
 from scipy.interpolate import griddata
+from scipy import stats
 import altair as alt
 import io
 import base64
-from scipy.interpolate import griddata
 import vl_convert as vlc
+from ydata_profiling import ProfileReport
 
-def generate_chart(kniznica, graf, df, xx, yy, bins=None, sltp=None, zz=None, rozlisenie=100):
-
-    shared_data = {}
+def generate_chart(kniznica, graf, df, xx, yy, bins=None, sltp=None, zz=None, rozlisenie=100, shared_data=None):
+    if shared_data is None:
+        shared_data = {}
     
     if kniznica == "Matplotlib":
         if graf in ["3D Surface Plot", "3D Wireframe Plot"]:
@@ -293,9 +294,13 @@ def generate_chart(kniznica, graf, df, xx, yy, bins=None, sltp=None, zz=None, ro
             ).interactive()
         
         elif graf == "Box Plot":
+            y_min = df[yy].min()
+            y_max = df[yy].max()
+            y_padding = (y_max - y_min) * 0.05
             fig = alt.Chart(df).mark_boxplot().encode(
                 x=alt.X(f'{xx}:N', title=xx) if xx else alt.value(0),
-                y=alt.Y(f'{yy}:Q', title=yy)
+                y=alt.Y(f'{yy}:Q', title=yy,
+                        scale=alt.Scale(domain=[y_min - y_padding, y_max + y_padding]))
             )
         
         fig = fig.properties(width=800, height=400)
@@ -328,6 +333,12 @@ if "kniznica_export" not in st.session_state:
 
 if "graf_typ_export" not in st.session_state:
     st.session_state.graf_typ_export = None
+
+if "eda_html" not in st.session_state:
+    st.session_state.eda_html = None
+
+if "eda_ready" not in st.session_state:
+    st.session_state.eda_ready = False
 
 def stiahnut_graf(fig, kniznica, format_suboru, nazov_grafu="graf"):
     try:
@@ -384,7 +395,6 @@ def stiahnut_graf(fig, kniznica, format_suboru, nazov_grafu="graf"):
                 buffer.write(json_str.encode())
                 
         elif kniznica == "Bokeh":
-            from bokeh.io import export_png
             if format_suboru == "HTML":
                 from bokeh.embed import file_html
                 from bokeh.resources import CDN
@@ -424,6 +434,31 @@ if subor is not None:
             df = pd.read_csv(subor, sep=None, engine='python')
         else:
             df = pd.read_excel(subor)
+        # Odstránenie BOM znakov z názvov stĺpcov
+        df.columns = df.columns.str.strip().str.replace('\ufeff', '', regex=False)
+
+        if "posledny_subor" not in st.session_state or st.session_state.posledny_subor != subor.name:
+            st.session_state.posledny_subor = subor.name
+            st.session_state.eda_ready = False
+            st.session_state.eda_html = None
+        
+        numericke_raw = df.select_dtypes(include=['number']).columns.tolist()
+        numericke = []
+        kategorialne = df.select_dtypes(include=['object']).columns.tolist()
+        id_stlpce = []
+        for col in numericke_raw:
+            n_unique = df[col].nunique()
+            n_rows = len(df)
+            col_clean = col.strip().replace('\ufeff', '')
+            
+            if 'id' in col_clean.lower() and n_unique == n_rows:
+                id_stlpce.append(col)  # sleduje ID stĺpce
+                continue
+            elif n_unique <= 10 and (n_unique / n_rows) < 0.2:
+                kategorialne.append(col)
+            else:
+                numericke.append(col)
+        sltpce = df.columns.tolist()
 
         stl1, stl2, stl3, stl4 = st.columns(4)
         with stl1:
@@ -431,22 +466,116 @@ if subor is not None:
         with stl2:
             st.metric("Počet stĺpcov", df.shape[1])
         with stl3:
-            st.metric("Numerické stĺpce", len(df.select_dtypes(include=['number']).columns))
+            st.metric("Numerické stĺpce", len(numericke))  # po preradení
         with stl4:
-            st.metric("Kategoriálne stĺpce", len(df.select_dtypes(include=['object']).columns))
-        
+            st.metric("Kategoriálne stĺpce", len(kategorialne))  # po preradení
+        if id_stlpce:
+            st.caption(f" Ignorované ID stĺpce (vyradené z analýzy): {', '.join(id_stlpce)}")
         with st.expander("Zobraziť dataset"):
             st.write(df.head(10))
+        with st.expander(" Automatický návrh grafov", expanded=True):
+            navrhy = []
 
-        numericke = df.select_dtypes(include=['number']).columns.tolist()
-        kategorialne = df.select_dtypes(include=['object']).columns.tolist()
-        sltpce = df.columns.tolist()
+            n_num = len(numericke)
+            n_kat = len(kategorialne)
 
-        mode = st.radio(
-            " Vyberte režim vizualizácie:",
-            ["Štandardný režim", "Porovnávací režim"],
-            horizontal=True
-        )
+            if n_num >= 1:
+                navrhy.append({
+                    "Typ premenných": "1 numerická premenná",
+                    "Odporúčané grafy": "Histogram, Box Plot",
+                    "Prečo": "Histogram ukáže rozdelenie hodnôt, Box Plot odhalí odľahlé hodnoty a štatistiky."
+                })
+            if n_num >= 2:
+                navrhy.append({
+                    "Typ premenných": "2 numerické premenné",
+                    "Odporúčané grafy": "Scatter Plot, Line Plot",
+                    "Prečo": "Scatter Plot ukáže vzťah medzi premennými, Line Plot vývoj v čase alebo poradí."
+                })
+            if n_num >= 3:
+                navrhy.append({
+                    "Typ premenných": "3+ numerické premenné",
+                    "Odporúčané grafy": "Heatmap, 3D Surface Plot, 3D Wireframe Plot",
+                    "Prečo": "Heatmap zobrazí korelácie medzi všetkými numerickými premennými naraz. 3D grafy ukážu vzťah troch premenných v priestore."
+                })
+            if n_kat >= 1:
+                navrhy.append({
+                    "Typ premenných": "1 kategoriálna premenná",
+                    "Odporúčané grafy": "Pie Chart, Bar Chart",
+                    "Prečo": "Pie Chart ukáže podiely kategórií, Bar Chart porovná ich početnosti alebo priemery."
+                })
+            if n_kat >= 1 and n_num >= 1:
+                navrhy.append({
+                    "Typ premenných": "1 kategoriálna + 1 numerická",
+                    "Odporúčané grafy": "Bar Chart, Box Plot",
+                    "Prečo": "Bar Chart porovná priemery skupín, Box Plot ukáže rozdelenie a outlineri v každej skupine."
+                })
+
+            if navrhy:
+                st.markdown("Na základe tvojho datasetu odporúčam:")
+                for n in navrhy:
+                    st.markdown(f"**{n['Typ premenných']}** →  `{n['Odporúčané grafy']}`")
+                    st.caption(n['Prečo'])
+            else:
+                st.info("Nepodarilo sa určiť typ premenných.")
+
+        with st.expander(" Detekcia problémov v dátach"):
+            problemy = []
+            # Duplicitné riadky
+            duplicity = df.duplicated().sum()
+            if duplicity > 0:
+                    problemy.append({"Stĺpec": "Celý dataset", "Typ problému": " Duplicitné riadky", 
+                                "Detail": f"{duplicity} duplicitných riadkov"})
+            for col in df.columns:
+                # Chýbajúce hodnoty
+                missing = df[col].isna().sum()
+                missing_pct = missing / len(df) * 100
+                if missing > 0:
+                    problemy.append({"Stĺpec": col, "Typ problému": "Chýbajúce hodnoty", 
+                                "Detail": f"{missing} hodnôt ({missing_pct:.1f}%)"})
+                
+                # Príliš veľa unikátov - nevhodné na Bar Chart
+                if col in kategorialne and df[col].nunique() > 20:
+                    problemy.append({"Stĺpec": col, "Typ problému": " Vysoká kardinalita", 
+                                "Detail": f"{df[col].nunique()} unikátnych hodnôt — nevhodné na Bar Chart"})
+                
+                # Outlineri pre numerické stĺpce (IQR metóda)
+                if col in numericke:
+                    Q1 = df[col].quantile(0.25)
+                    Q3 = df[col].quantile(0.75)
+                    IQR = Q3 - Q1
+                    outlieri = ((df[col] < Q1 - 1.5 * IQR) | (df[col] > Q3 + 1.5 * IQR)).sum()
+                    if outlieri > 0:
+                        problemy.append({"Stĺpec": col, "Typ problému": "Odľahlé hodnoty", 
+                                    "Detail": f"{outlieri} outlinerov (IQR metóda)"})
+            
+            if problemy:
+                st.dataframe(pd.DataFrame(problemy), use_container_width=True, hide_index=True)
+            else:
+                st.success(" Žiadne problémy nenájdené!")
+
+        with st.expander(" EDA Report"):
+            if st.button("Generovať EDA Report", type="primary"):
+                with st.spinner("Generujem report... (môže trvať 10–30 sekúnd)"):
+                    profile = ProfileReport(
+                        df,
+                        title="EDA Report",
+                        explorative=True,
+                        minimal=False
+                    )
+                    st.session_state.eda_html = profile.to_html()
+                    st.session_state.eda_ready = True
+
+            if st.session_state.get("eda_ready") and st.session_state.eda_html:
+                st.download_button(
+                    label=" Stiahnuť EDA Report (HTML)",
+                    data=st.session_state.eda_html.encode("utf-8"),
+                    file_name="eda_report.html",
+                    mime="text/html",
+                    use_container_width=True
+                )
+                components_st.html(st.session_state.eda_html, height=800, scrolling=True)
+
+        mode = st.radio(" Vyberte režim vizualizácie:",["Štandardný režim", "Porovnávací režim"],horizontal=True )
         
         if mode == "Štandardný režim":
             stl1, stl2 = st.columns(2)
@@ -483,7 +612,10 @@ if subor is not None:
                 st.caption("Pre 3D grafy vyberte Matplotlib alebo Plotly")
 
             st.markdown("###  Nastavenie premenných")
-                
+            sltp = None
+            zz = None
+            bins = 30
+            rozlisenie = 100
             if graf in ["Scatter Plot", "Line Plot"]:
                 stl1, stl2 = st.columns(2)
                 with stl1:
@@ -502,10 +634,11 @@ if subor is not None:
                 stl1, stl2 = st.columns(2)
                 with stl1:
                     xx = st.selectbox("Premenná:", numericke if numericke else sltpce, key="stdx")
+                    st.session_state["hist_xx"] = xx 
                 with stl2:
                     bins = st.slider("Počet binov:", 5, 100, 30, key="std_bins")
                 yy = None
-            
+                
             elif graf == "Box Plot":
                 stl1, stl2 = st.columns(2)
                 with stl1:
@@ -786,6 +919,112 @@ if subor is not None:
                     {div}
                     """, height=500)
                 st.markdown("---")
+                if st.session_state.graf_typ_export in ["Scatter Plot", "Line Plot"]:
+                    if xx in numericke and yy in numericke:
+                        st.markdown("### Korelácia")
+                        corr, p = stats.pearsonr(df[xx].dropna(), df[yy].dropna())
+                        if p < 0.05:
+                            st.info(f"**Pearsonova korelácia**: r = {corr:.3f}, p = {p:.4f} — štatisticky významná korelácia")
+                        else:
+                            st.info(f"**Pearsonova korelácia**: r = {corr:.3f}, p = {p:.4f} — korelácia nie je štatisticky významná")
+                        st.caption("r blízko 1 alebo -1 = silná korelácia, r blízko 0 = slabá korelácia.")
+
+                elif st.session_state.graf_typ_export == "Histogram":
+                    hist_xx = st.session_state.get("hist_xx")
+                    if not hist_xx:
+                        hist_xx = xx  # záložný plán ak session state chýba
+                    if hist_xx and hist_xx in numericke:
+                        data = df[hist_xx].dropna()
+                        st.markdown("### Analýza rozdelenia")
+                        if len(data) >= 3 and len(data) <= 5000:
+                            stat, p = stats.shapiro(data)
+                            if p > 0.05:
+                                st.success(f"**Shapiro-Wilk**: p = {p:.4f} — Normálne rozdelenie → odporúčané testy: **t-test, ANOVA**")
+                            else:
+                                st.warning(f"**Shapiro-Wilk**: p = {p:.4f} — Nie je normálne rozdelenie → odporúčané testy: **Mann-Whitney, Kruskal-Wallis**")
+                            st.caption("Shapiro-Wilk testuje, či dáta pochádzajú z normálneho rozdelenia. p > 0.05 = normálne rozdelenie.")
+                        elif len(data) > 5000:
+                            st.info("Veľký dataset (>5000 hodnôt) — Shapiro-Wilk nie je spoľahlivý. Použite vizuálnu kontrolu Q-Q plotu.")
+                        else:
+                            st.warning("Príliš málo hodnôt pre Shapiro-Wilk test (min. 3).")
+
+                        # Tlačidlo pre Q-Q plot
+                        if "show_qq" not in st.session_state:
+                            st.session_state.show_qq = False
+
+                        if st.button(" Zobraziť Q-Q plot vedľa histogramu", key="qq_btn"):
+                            st.session_state.show_qq = True
+
+                        if st.session_state.show_qq:
+                            col_hist, col_qq = st.columns(2)
+                            with col_hist:
+                                fig_h, ax_h = plt.subplots(figsize=(6, 4))
+                                ax_h.hist(data, bins=st.session_state.get("std_bins", 30),
+                                          edgecolor='black', color='steelblue', alpha=0.7)
+                                ax_h.set_title(f"Histogram — {hist_xx}")
+                                ax_h.set_xlabel(hist_xx)
+                                ax_h.set_ylabel("Počet")
+                                plt.tight_layout()
+                                st.pyplot(fig_h)
+                                plt.close(fig_h)
+                            with col_qq:
+                                fig_q, ax_q = plt.subplots(figsize=(6, 4))
+                                stats.probplot(data, plot=ax_q)
+                                ax_q.set_title(f"Q-Q plot — {hist_xx}")
+                                plt.tight_layout()
+                                st.pyplot(fig_q)
+                                plt.close(fig_q)
+
+                elif st.session_state.graf_typ_export == "Box Plot":
+                    if yy and yy in numericke:
+                        st.markdown("### Štatistické porovnanie skupín")
+                        if xx and xx in kategorialne:
+                            skupiny = df[xx].dropna().unique()
+                            data_skupiny = [df[df[xx] == s][yy].dropna() for s in skupiny]
+
+                            stats_data = []
+                            for s, d in zip(skupiny, data_skupiny):
+                                stats_data.append({
+                                    "Skupina": s,
+                                    "N": len(d),
+                                    "Priemer": round(d.mean(), 3),
+                                    "Medián": round(d.median(), 3),
+                                    "Std": round(d.std(), 3)
+                                })
+                            st.dataframe(pd.DataFrame(stats_data), use_container_width=True, hide_index=True)
+
+                            if len(skupiny) == 2:
+                                normalne = all(len(d) >= 3 and stats.shapiro(d)[1] > 0.05 for d in data_skupiny if len(d) >= 3)
+                                if normalne:
+                                    stat, p = stats.ttest_ind(*data_skupiny)
+                                    test_nazov = "t-test"
+                                    st.caption("Použitý t-test: normálne rozdelenie, 2 skupiny.")
+                                else:
+                                    stat, p = stats.mannwhitneyu(*data_skupiny)
+                                    test_nazov = "Mann-Whitney U test"
+                                    st.caption("Použitý Mann-Whitney U test: nie normálne rozdelenie, 2 skupiny.")
+                                if p < 0.05:
+                                    st.error(f"**{test_nazov}**: p = {p:.4f} — skupiny sa štatisticky významne líšia")
+                                else:
+                                    st.success(f"**{test_nazov}**: p = {p:.4f} — skupiny sa štatisticky významne nelíšia")
+
+                            elif len(skupiny) > 2:
+                                normalne = all(len(d) >= 3 and stats.shapiro(d)[1] > 0.05 for d in data_skupiny if len(d) >= 3)
+                                if normalne:
+                                    stat, p = stats.f_oneway(*data_skupiny)
+                                    test_nazov = "ANOVA"
+                                    st.caption("Použitá ANOVA: normálne rozdelenie, 3+ skupiny.")
+                                else:
+                                    stat, p = stats.kruskal(*data_skupiny)
+                                    test_nazov = "Kruskal-Wallis test"
+                                    st.caption("Použitý Kruskal-Wallis test: nie normálne rozdelenie, 3+ skupiny.")
+                                if p < 0.05:
+                                    st.error(f"**{test_nazov}**: p = {p:.4f} — medzi skupinami sú štatisticky významné rozdiely")
+                                else:
+                                    st.success(f"**{test_nazov}**: p = {p:.4f} — medzi skupinami nie sú štatisticky významné rozdiely")
+                        else:
+                            st.info("Pre porovnanie skupín vyber kategoriálnu premennú na osi X.")
+
                 st.markdown("### Export grafu")
 
                 col1, col2 = st.columns([2, 1])
@@ -928,37 +1167,153 @@ if subor is not None:
                 if len(kniznice) < 2:
                     st.warning("Vyberte aspoň 2 knižnice na porovnanie")
                 else:
-                            # vytvori stlpce dynamicky podla poctu kniznic
-                            cols = st.columns(len(kniznice))
-                            # zdielanie dat pre synchronizaciu grafov
-                            shared_data = {}
-                            # prejde vsetky vybrane knižzice
-                            for idx, kniznica in enumerate(kniznice):
-                                with cols[idx]:
-                                    st.markdown(f"### {kniznica}")
-                                    
-                                    try:
-                                        # vygeneruje graf pomocou univerzalnej funkcie
-                                        fig, chart_shared_data = generate_chart(
-                                            kniznica=kniznica,
-                                            graf=graf,
-                                            df=df,
-                                            xx=xx,
-                                            yy=yy,
-                                            bins=bins,
-                                            sltp=sltp,
-                                            zz=zz,
-                                            rozlisenie=rozlisenie 
-                                        )
-                                        
-                                        # aktualizuje zdielane data (prvy graf nastavi rozsahy)
-                                        if idx == 0:
-                                            shared_data.update(chart_shared_data)
+                    cols = st.columns(len(kniznice))
+                    shared_data = {}
+                    for idx, kniznica in enumerate(kniznice):
+                        with cols[idx]:
+                            st.markdown(f"### {kniznica}")
+                            try:
+                                fig, chart_shared_data = generate_chart(
+                                    kniznica=kniznica,
+                                    graf=graf,
+                                    df=df,
+                                    xx=xx,
+                                    yy=yy,
+                                    bins=bins,
+                                    sltp=sltp,
+                                    zz=zz,
+                                    rozlisenie=rozlisenie,
+                                    shared_data=shared_data  # ← pridané
+                                )
+                                shared_data.update(chart_shared_data)  # ← zmazaná podmienka if idx == 0
+                                display_chart(fig, kniznica)
+                            except Exception as e:
+                                st.error(f"Chyba pri generovaní {kniznica}: {str(e)}")
+                        # Porovnanie skupín - automaticky pod grafmi
+                if graf =="Box Plot" and yy and yy in numericke:
+                    st.markdown("---")
+                    st.markdown("### Štatistické porovnanie skupín")
+                    
+                    if xx and xx in kategorialne:
+                        skupiny = df[xx].dropna().unique()
+                        data_skupiny = [df[df[xx] == s][yy].dropna() for s in skupiny]
                         
-                                        # zobrazi graf
-                                        display_chart(fig, kniznica)
-                                        
-                                    except Exception as e:
-                                        st.error(f"Chyba pri generovaní {kniznica}: {str(e)}")
+                        # Základné štatistiky pre každú skupinu
+                        stats_data = []
+                        for s, d in zip(skupiny, data_skupiny):
+                            stats_data.append({
+                                "Skupina": s,
+                                "N": len(d),
+                                "Priemer": round(d.mean(), 3),
+                                "Medián": round(d.median(), 3),
+                                "Std": round(d.std(), 3)
+                            })
+                        st.dataframe(pd.DataFrame(stats_data), use_container_width=True, hide_index=True)
+                        
+                        if len(skupiny) == 2:
+                            normalne = all(len(d) >= 3 and stats.shapiro(d)[1] > 0.05 for d in data_skupiny if len(d) >= 3)
+                            
+                            if normalne:
+                                stat, p = stats.ttest_ind(*data_skupiny)
+                                test_nazov = "t-test"
+                                st.caption("Použitý t-test: dáta majú normálne rozdelenie (Shapiro-Wilk p > 0.05) a porovnávame 2 skupiny.")
+                            else:
+                                stat, p = stats.mannwhitneyu(*data_skupiny)
+                                test_nazov = "Mann-Whitney U test"
+                                st.caption("Použitý Mann-Whitney U test: dáta nemajú normálne rozdelenie — neparametrická alternatíva k t-testu pre 2 skupiny.")
+                            if p < 0.05:
+                                st.error(f"**{test_nazov}**: p = {p:.4f} — skupiny sa **štatisticky významne líšia** (p < 0.05)")
+                            else:
+                                st.success(f"**{test_nazov}**: p = {p:.4f} — skupiny sa **štatisticky významne nelíšia** (p ≥ 0.05)")
+
+                            # ✅ NOVÉ: Cohen's d pre 2 skupiny
+                            d1, d2 = data_skupiny[0], data_skupiny[1]
+                            pooled_std = np.sqrt((d1.std()**2 + d2.std()**2) / 2)
+                            if pooled_std > 0:
+                                cohens_d = (d1.mean() - d2.mean()) / pooled_std
+                                abs_d = abs(cohens_d)
+                                if abs_d < 0.2:
+                                    efekt = "zanedbateľný"
+                                    farba = "st.info"
+                                elif abs_d < 0.5:
+                                    efekt = "malý"
+                                    farba = "st.info"
+                                elif abs_d < 0.8:
+                                    efekt = "stredný"
+                                    farba = "st.warning"
+                                else:
+                                    efekt = "veľký"
+                                    farba = "st.error"
+                                
+                                col_d1, col_d2 = st.columns(2)
+                                with col_d1:
+                                    st.metric("Cohen's d", f"{cohens_d:.3f}")
+                                with col_d2:
+                                    st.metric("Veľkosť efektu", efekt)
+                                st.caption("Cohen's d meria veľkosť rozdielu medzi skupinami: |d| < 0.2 = zanedbateľný, 0.2–0.5 = malý, 0.5–0.8 = stredný, > 0.8 = veľký efekt.")
+                        
+                        elif len(skupiny) > 2:
+                            normalne = all(len(d) >= 3 and stats.shapiro(d)[1] > 0.05 for d in data_skupiny if len(d) >= 3)
+                            
+                            if normalne:
+                                stat, p = stats.f_oneway(*data_skupiny)
+                                test_nazov = "ANOVA"
+                                st.caption("Použitá ANOVA: dáta majú normálne rozdelenie a porovnávame 3 a viac skupín.")
+                            else:
+                                stat, p = stats.kruskal(*data_skupiny)
+                                test_nazov = "Kruskal-Wallis test"
+                                st.caption("Použitý Kruskal-Wallis test: dáta nemajú normálne rozdelenie — neparametrická alternatíva k ANOVA pre 3 a viac skupín.")
+                            if p < 0.05:
+                                st.error(f"**{test_nazov}**: p = {p:.4f} — medzi skupinami sú **štatisticky významné rozdiely** (p < 0.05)")
+                            else:
+                                st.success(f"**{test_nazov}**: p = {p:.4f} — medzi skupinami **nie sú štatisticky významné rozdiely** (p ≥ 0.05)")
+                            
+                            # ✅ NOVÉ: Eta² pre 3+ skupiny
+                            celkovy_priemer = np.concatenate(data_skupiny).mean()
+                            ss_between = sum(len(d) * (d.mean() - celkovy_priemer)**2 for d in data_skupiny)
+                            ss_total = sum(((v - celkovy_priemer)**2) for d in data_skupiny for v in d)
+                            if ss_total > 0:
+                                eta2 = ss_between / ss_total
+                                if eta2 < 0.01:
+                                    efekt = "zanedbateľný"
+                                elif eta2 < 0.06:
+                                    efekt = "malý"
+                                elif eta2 < 0.14:
+                                    efekt = "stredný"
+                                else:
+                                    efekt = "veľký"
+                                
+                                col_e1, col_e2 = st.columns(2)
+                                with col_e1:
+                                    st.metric("Eta²", f"{eta2:.3f}")
+                                with col_e2:
+                                    st.metric("Veľkosť efektu", efekt)
+                                st.caption("Eta² meria podiel variancie vysvetlenej skupinami: < 0.01 = zanedbateľný, 0.01–0.06 = malý, 0.06–0.14 = stredný, > 0.14 = veľký efekt.")
+                
+                elif graf in ["Scatter Plot", "Line Plot"] and xx in numericke and yy in numericke:
+                    st.markdown("---")
+                    st.markdown("### Korelácia")
+                    corr, p = stats.pearsonr(df[xx].dropna(), df[yy].dropna())
+                    if p < 0.05:
+                        st.info(f"**Pearsonova korelácia**: r = {corr:.3f}, p = {p:.4f} **štatisticky významná korelácia**")
+                    else:
+                        st.info(f"**Pearsonova korelácia**: r = {corr:.3f}, p = {p:.4f} korelácia **nie je štatisticky významná**")
+                    st.caption("Pearsonova korelácia meria silu lineárneho vzťahu medzi dvoma numerickými premennými. r blízko 1 alebo -1 = silná korelácia, r blízko 0 = slabá korelácia.")
+                
+                elif graf == "Histogram" and xx and xx in numericke:
+                    st.markdown("---")
+                    st.markdown("### Analýza rozdelenia")
+                    data = df[xx].dropna()
+                    
+                    if len(data) >= 3 and len(data) <= 5000:
+                        stat, p = stats.shapiro(data)
+                        if p > 0.05:
+                            st.success(f"**Shapiro-Wilk**: p = {p:.4f} normálne rozdelenie odporúčané: **t-test, ANOVA**")
+                            st.caption("Dáta majú normálne rozdelenie — môžeš použiť parametrické testy ktoré predpokladajú normalitu.")
+                        else:
+                            st.warning(f"**Shapiro-Wilk**: p = {p:.4f} nie je normálne rozdelenie odporúčané: **Mann-Whitney, Kruskal-Wallis**")
+                            st.caption("Dáta nemajú normálne rozdelenie — použite neparametrické testy ktoré nekladú podmienky na rozdelenie.")
+                    else:
+                        st.info("Pre Shapiro-Wilkov test je potrebných 3–5000 hodnôt.")
     except Exception as e:
         st.error(f" Chyba pri načítaní súboru: {str(e)}")
