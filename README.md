@@ -13,3 +13,4 @@ Pre správne fungovanie dashboardu je potrebné použiť tieto verzie knižníc:
 - Atair
 - Scipy
 - vl-convert-python
+- ydata-profiling
