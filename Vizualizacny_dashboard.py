@@ -864,29 +864,37 @@ if subor is not None:
 
                     elif kniznica == "Altair":
                         if graf == "Scatter Plot":
+                            selection = alt.selection_point()
                             fig = alt.Chart(df).mark_circle(size=60).encode(
-                                x=xx, y=yy, tooltip=[xx, yy]
-                            ).interactive()
+                                x=xx, y=yy, tooltip=[xx, yy],
+                                opacity=alt.condition(selection, alt.value(1), alt.value(0.2))
+                            ).add_params(selection).interactive()
 
                         elif graf == "Line Plot":
+                            selection = alt.selection_point()
                             fig = alt.Chart(df).mark_line().encode(
-                                x=xx, y=yy, tooltip=[xx, yy]
-                            ).interactive()
+                                x=xx, y=yy, tooltip=[xx, yy],
+                                opacity=alt.condition(selection, alt.value(1), alt.value(0.2))
+                            ).add_params(selection).interactive()
 
                         elif graf == "Bar Chart":
+                            selection = alt.selection_point()
                             fig = alt.Chart(df).mark_bar().encode(
-                                x=xx, y=f'mean({yy})', tooltip=[xx, f'mean({yy})']
-                            ).interactive()
+                                x=xx, y=f'mean({yy})', tooltip=[xx, f'mean({yy})'],
+                                opacity=alt.condition(selection, alt.value(1), alt.value(0.2))
+                            ).add_params(selection).interactive()
                         
                         elif graf == "Histogram":
+                            selection = alt.selection_point()
                             fig = alt.Chart(df).mark_bar().encode(
-                                alt.X(f'{xx}:Q', bin=alt.Bin(maxbins=bins)),  #na os x ide numerická premenná
-                                y='count()',   
-                            ).interactive() 
-                        
+                                alt.X(f'{xx}:Q', bin=alt.Bin(maxbins=bins)),
+                                y='count()',
+                                opacity=alt.condition(selection, alt.value(1), alt.value(0.2))
+                            ).add_params(selection).interactive()
+
                         elif graf == "Box Plot":
                             fig = alt.Chart(df).mark_boxplot().encode(
-                                x=f'{xx}:N' if xx else alt.value(0), #použije sa ako kategória (:N = nominal) na osi X alebo všetky hodnoty budú v jednom boxe (na pozícii 0)
+                                x=f'{xx}:N' if xx else alt.value(0),
                                 y=f'{yy}:Q'
                             )
                         
