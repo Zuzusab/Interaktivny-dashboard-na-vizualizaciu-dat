@@ -20,6 +20,8 @@ import io
 import base64
 import vl_convert as vlc
 from ydata_profiling import ProfileReport
+import plotly.io as pio
+
 
 def generate_chart(kniznica, graf, df, xx, yy, bins=None, sltp=None, zz=None, rozlisenie=100, shared_data=None):
     if shared_data is None:
@@ -178,8 +180,14 @@ def generate_chart(kniznica, graf, df, xx, yy, bins=None, sltp=None, zz=None, ro
                 fig = px.imshow(corr, aspect="auto")
         
         elif graf == "Pie Chart":
-            hodnoty = df[xx].value_counts()
-            fig = px.pie(values=hodnoty.values, names=hodnoty.index)
+                pio.templates["vlastna_sablona"] = go.layout.Template(
+                    layout=dict(
+                        font=dict(family="Arial", size=12),
+                        colorway=["#FF0000", "#00FF00", "#0000FF", "#FF7F00", "#FF00FF"]
+                    )
+                )
+                hodnoty = df[xx].value_counts()
+                fig = px.pie(values=hodnoty.values, names=hodnoty.index, template="vlastna_sablona")
         
         elif graf == "3D Wireframe Plot":
             xi = np.linspace(df[xx].min(), df[xx].max(), rozlisenie)
