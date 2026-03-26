@@ -751,6 +751,7 @@ if subor is not None:
                         
                         elif graf == "Bar Chart":
                             sns.barplot(data=df, x=xx, y=yy, ax=ax)
+                            plt.xticks(rotation=45, ha='right')
 
                         elif graf == "Histogram":
                             sns.histplot(data=df, x=xx, bins=bins, ax=ax)
