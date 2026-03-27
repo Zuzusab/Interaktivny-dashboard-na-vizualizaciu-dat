@@ -856,9 +856,9 @@ if subor is not None:
                             fig.scatter(df[xx].values, df[yy].values, size=8, alpha=0.6)
                         
                         elif graf == "Line Plot":
-                            df_sorted = df.sort_values(by=xx)
-                            fig.line(df_sorted[xx].values, df_sorted[yy].values, line_width=2)
-                        
+                            df_agg = df.groupby(xx)[yy].mean().reset_index()
+                            fig.line(df_agg[xx].values, df_agg[yy].values, line_width=2)
+                                                
                         elif graf == "Bar Chart":
                             grouped = df.groupby(xx)[yy].mean()
                             fig.vbar(x=list(range(len(grouped))), top=grouped.values, width=0.8)
@@ -880,8 +880,9 @@ if subor is not None:
                             ).add_params(selection).interactive()
 
                         elif graf == "Line Plot":
+                            df_agg = df.groupby(xx)[yy].mean().reset_index()
                             selection = alt.selection_point()
-                            fig = alt.Chart(df).mark_line().encode(
+                            fig = alt.Chart(df_agg).mark_line().encode(
                                 x=xx, y=yy, tooltip=[xx, yy],
                                 opacity=alt.condition(selection, alt.value(1), alt.value(0.2))
                             ).add_params(selection).interactive()
