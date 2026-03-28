@@ -1,5 +1,4 @@
 import streamlit as st
-import kaleido
 import pandas as pd
 import numpy as np
 #fix pre Bokeh kompatibilitu
@@ -17,8 +16,6 @@ from scipy.interpolate import griddata
 from scipy import stats
 import altair as alt
 import io
-import base64
-import vl_convert as vlc
 from ydata_profiling import ProfileReport
 import plotly.io as pio
 
@@ -363,19 +360,7 @@ def stiahnut_graf(fig, kniznica, format_suboru, nazov_grafu="graf"):
         
                 
         elif kniznica == "Plotly":
-            if format_suboru == "PNG":
-                fig_export = fig
-                fig_export.update_layout(template="plotly")  # explicitný farebný template
-                buffer = io.BytesIO(fig_export.to_image(format="png", engine="kaleido", scale=2))
-            elif format_suboru == "PDF":
-                fig_export = fig
-                fig_export.update_layout(template="plotly")
-                buffer = io.BytesIO(fig_export.to_image(format="pdf", engine="kaleido"))
-            elif format_suboru == "SVG":
-                fig_export = fig
-                fig_export.update_layout(template="plotly")
-                buffer = io.BytesIO(fig_export.to_image(format="svg", engine="kaleido"))
-            elif format_suboru == "HTML":
+            if format_suboru == "HTML":
                 html_str = fig.to_html(include_plotlyjs="cdn", full_html=True)
                 buffer = io.BytesIO(html_str.encode("utf-8"))
 
@@ -384,20 +369,7 @@ def stiahnut_graf(fig, kniznica, format_suboru, nazov_grafu="graf"):
             if format_suboru == "HTML":
                 html_str = fig.to_html()
                 buffer.write(html_str.encode())
-            elif format_suboru == "PNG":
-                try:
-                    png_data = vlc.vegalite_to_png(fig.to_json())
-                    buffer.write(png_data)
-                except ImportError:
-                    st.error("Nainštaluj vl-convert: pip install vl-convert-python")
-                    return None
-            elif format_suboru == "SVG":
-                try:
-                    svg_str = vlc.vegalite_to_svg(fig.to_json())
-                    buffer.write(svg_str.encode())
-                except ImportError:
-                    st.error("Nainštaluj vl-convert: pip install vl-convert-python")
-                    return None
+
             elif format_suboru == "JSON":
                 json_str = fig.to_json()
                 buffer.write(json_str.encode())
@@ -419,9 +391,9 @@ def stiahnut_graf(fig, kniznica, format_suboru, nazov_grafu="graf"):
 Podporovane_formaty = {
     "Matplotlib": ["PNG", "PDF", "SVG"],
     "Seaborn": ["PNG", "PDF", "SVG"],
-    "Plotly": ["HTML", "PNG", "SVG", "PDF"],
+    "Plotly": ["HTML"],
     "Bokeh": ["HTML"],
-    "Altair": ["HTML", "PNG", "SVG", "JSON"]
+    "Altair": ["HTML", "JSON"]
 }
 
 st.markdown("""
@@ -778,34 +750,32 @@ if subor is not None:
                     elif kniznica == "Plotly":
                         st.markdown("### Plotly")
                         if graf == "Scatter Plot":
-                            fig = px.scatter(df, x=xx, y=yy)
-                                
+                            fig = px.scatter(df, x=xx, y=yy, color_discrete_sequence=px.colors.qualitative.Plotly)
+
                         elif graf == "Line Plot":
                             df_agg = df.groupby(xx)[yy].mean().reset_index().sort_values(by=xx)
-                            fig = px.line(df_agg, x=xx, y=yy, markers=True)
-                                
+                            fig = px.line(df_agg, x=xx, y=yy, markers=True, color_discrete_sequence=px.colors.qualitative.Plotly)
+
                         elif graf == "Bar Chart":
                             df_grouped = df.groupby(xx)[yy].mean().reset_index()
-                            fig = px.bar(df_grouped, x=xx, y=yy, labels={yy: f"Priemer {yy}"}, text=yy)
-                            fig.update_traces(texttemplate='%{text:.2f}', textposition='outside')
-                            fig.update_layout(xaxis_title=xx, yaxis_title=f"Priemer {yy}")
-                                
+                            fig = px.bar(df_grouped, x=xx, y=yy, labels={yy: f"Priemer {yy}"}, text=yy, color_discrete_sequence=px.colors.qualitative.Plotly)
+
                         elif graf == "Histogram":
-                            data_clean = df[xx].dropna()
-                            fig = px.histogram(df, x=xx, nbins=bins)
+                            fig = px.histogram(df, x=xx, nbins=bins, color_discrete_sequence=px.colors.qualitative.Plotly)
 
                         elif graf == "Box Plot":
-                            fig = px.box(df, x=xx, y=yy)
-                                
+                             fig = px.box(df, x=xx, y=yy, color_discrete_sequence=px.colors.qualitative.Plotly)
+
                         elif graf == "Pie Chart":
-                            hodnoty = df[xx].value_counts()
-                            fig = px.pie(values=hodnoty.values, names=hodnoty.index)
+                                hodnoty = df[xx].value_counts()
+                                fig = px.pie(values=hodnoty.values, names=hodnoty.index)
+                                fig.update_layout(template="plotly")
 
                         elif graf == "Heatmap":
                             if sltp:
                                 corr = df[sltp].corr()
-                                fig = px.imshow(corr, aspect = "auto")
-                        
+                                fig = px.imshow(corr, aspect="auto", color_continuous_scale="RdBu_r", zmin=-1, zmax=1)
+                                
                         elif graf == "3D Wireframe Plot":
                             xi = np.linspace(df[xx].min(), df[xx].max(), rozlisenie)
                             yi = np.linspace(df[yy].min(), df[yy].max(), rozlisenie)
