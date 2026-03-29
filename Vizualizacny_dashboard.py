@@ -20,6 +20,40 @@ from ydata_profiling import ProfileReport
 import plotly.io as pio
 
 
+def vyber_korelacia(df, xx, yy):
+    spolocne = df[[xx, yy]].dropna()
+    data_x = spolocne[xx].to_numpy().astype(float)
+    data_y = spolocne[yy].to_numpy().astype(float)
+    n = len(spolocne)
+    
+    if n < 3:
+        return None, None, None, "príliš málo hodnôt", n
+    
+    try:
+        if n <= 5000:
+            p_x = float(stats.shapiro(data_x).pvalue)
+            p_y = float(stats.shapiro(data_y).pvalue)
+        else:
+            p_x = float(stats.normaltest(data_x).pvalue)
+            p_y = float(stats.normaltest(data_y).pvalue)
+    except Exception:
+        # ak test zlyhá, použi Spearman ako bezpečnejšiu voľbu
+        corr, p = stats.spearmanr(data_x, data_y)
+        return float(corr), float(p), "Spearman", "test normality zlyhal", n
+    
+    normalita = (p_x > 0.05) and (p_y > 0.05)
+    
+    if normalita:
+        corr, p = stats.pearsonr(data_x, data_y)
+        metoda = "Pearson"
+        dovod = "obe premenné majú normálne rozdelenie"
+    else:
+        corr, p = stats.spearmanr(data_x, data_y)
+        metoda = "Spearman"
+        dovod = "aspoň jedna premenná nemá normálne rozdelenie"
+    
+    return float(corr), float(p), metoda, dovod, n
+
 def generate_chart(kniznica, graf, df, xx, yy, bins=None, sltp=None, zz=None, rozlisenie=100, shared_data=None):
     if shared_data is None:
         shared_data = {}
@@ -907,16 +941,31 @@ if subor is not None:
                     {div}
                     """, height=500)
                 st.markdown("---")
-                if st.session_state.graf_typ_export in ["Scatter Plot", "Line Plot"]:
+                if st.session_state.graf_typ_export == "Scatter Plot":
                     if xx in numericke and yy in numericke:
                         st.markdown("### Korelácia")
-                        corr, p = stats.pearsonr(df[xx].dropna(), df[yy].dropna())
-                        if p < 0.05:
-                            st.info(f"**Pearsonova korelácia**: r = {corr:.3f}, p = {p:.4f} — štatisticky významná korelácia")
+                        corr, p, metoda, dovod, n = vyber_korelacia(df, xx, yy)
+        
+                        if metoda is None:
+                            st.warning(f"Koreláciu nie je možné vypočítať: {dovod}")
                         else:
-                            st.info(f"**Pearsonova korelácia**: r = {corr:.3f}, p = {p:.4f} — korelácia nie je štatisticky významná")
-                        st.caption("r blízko 1 alebo -1 = silná korelácia, r blízko 0 = slabá korelácia.")
-
+                            symbol = "r" if metoda == "Pearson" else "ρ"
+                            if p < 0.05:
+                                st.info(f"**{metoda}ova korelácia** ({dovod}): {symbol} = {corr:.3f}, p = {p:.4f} — štatisticky významná")
+                            else:
+                                st.info(f"**{metoda}ova korelácia** ({dovod}): {symbol} = {corr:.3f}, p = {p:.4f} — nie je štatisticky významná")
+                            
+                            abs_r = abs(corr)
+                            if abs_r < 0.1: sila = "zanedbateľná"
+                            elif abs_r < 0.3: sila = "slabá"
+                            elif abs_r < 0.5: sila = "stredná"
+                            elif abs_r < 0.7: sila = "silná"
+                            else: sila = "veľmi silná"
+                            
+                            st.caption(
+                                f"Sila korelácie: **{sila}** (|{symbol}| = {abs_r:.3f}). "
+                                f"{'Pearsonov koeficient meria lineárny vzťah.' if metoda == 'Pearson' else 'Spearmanov koeficient meria monotónny vzťah — robustnejší voči outlinerom.'}"
+                            )
                 elif st.session_state.graf_typ_export == "Histogram":
                     hist_xx = st.session_state.get("hist_xx")
                     if not hist_xx:
@@ -1214,7 +1263,7 @@ if subor is not None:
                             else:
                                 st.success(f"**{test_nazov}**: p = {p:.4f} — skupiny sa **štatisticky významne nelíšia** (p ≥ 0.05)")
 
-                            # ✅ NOVÉ: Cohen's d pre 2 skupiny
+                            # Cohen's d pre 2 skupiny
                             d1, d2 = data_skupiny[0], data_skupiny[1]
                             pooled_std = np.sqrt((d1.std()**2 + d2.std()**2) / 2)
                             if pooled_std > 0:
@@ -1256,7 +1305,7 @@ if subor is not None:
                             else:
                                 st.success(f"**{test_nazov}**: p = {p:.4f} — medzi skupinami **nie sú štatisticky významné rozdiely** (p ≥ 0.05)")
                             
-                            # ✅ NOVÉ: Eta² pre 3+ skupiny
+                            # Eta² pre 3+ skupiny
                             celkovy_priemer = np.concatenate(data_skupiny).mean()
                             ss_between = sum(len(d) * (d.mean() - celkovy_priemer)**2 for d in data_skupiny)
                             ss_total = sum(((v - celkovy_priemer)**2) for d in data_skupiny for v in d)
@@ -1278,16 +1327,31 @@ if subor is not None:
                                     st.metric("Veľkosť efektu", efekt)
                                 st.caption("Eta² meria podiel variancie vysvetlenej skupinami: < 0.01 = zanedbateľný, 0.01–0.06 = malý, 0.06–0.14 = stredný, > 0.14 = veľký efekt.")
                 
-                elif graf in ["Scatter Plot", "Line Plot"] and xx in numericke and yy in numericke:
+                elif graf == "Scatter Plot" and xx in numericke and yy in numericke:
                     st.markdown("---")
                     st.markdown("### Korelácia")
-                    corr, p = stats.pearsonr(df[xx].dropna(), df[yy].dropna())
-                    if p < 0.05:
-                        st.info(f"**Pearsonova korelácia**: r = {corr:.3f}, p = {p:.4f} **štatisticky významná korelácia**")
+                    corr, p, metoda, dovod, n = vyber_korelacia(df, xx, yy)
+        
+                    if metoda is None:
+                        st.warning(f"Koreláciu nie je možné vypočítať: {dovod}")
                     else:
-                        st.info(f"**Pearsonova korelácia**: r = {corr:.3f}, p = {p:.4f} korelácia **nie je štatisticky významná**")
-                    st.caption("Pearsonova korelácia meria silu lineárneho vzťahu medzi dvoma numerickými premennými. r blízko 1 alebo -1 = silná korelácia, r blízko 0 = slabá korelácia.")
-                
+                        symbol = "r" if metoda == "Pearson" else "ρ"
+                        if p < 0.05:
+                            st.info(f"**{metoda}ova korelácia** ({dovod}): {symbol} = {corr:.3f}, p = {p:.4f} — štatisticky významná")
+                        else:
+                            st.info(f"**{metoda}ova korelácia** ({dovod}): {symbol} = {corr:.3f}, p = {p:.4f} — nie je štatisticky významná")
+                        
+                        abs_r = abs(corr)
+                        if abs_r < 0.1: sila = "zanedbateľná"
+                        elif abs_r < 0.3: sila = "slabá"
+                        elif abs_r < 0.5: sila = "stredná"
+                        elif abs_r < 0.7: sila = "silná"
+                        else: sila = "veľmi silná"
+                        
+                        st.caption(
+                            f"Sila korelácie: **{sila}** (|{symbol}| = {abs_r:.3f}). "
+                            f"{'Pearsonov koeficient meria lineárny vzťah.' if metoda == 'Pearson' else 'Spearmanov koeficient meria monotónny vzťah — robustnejší voči outlinerom.'}"
+                        )
                 elif graf == "Histogram" and xx and xx in numericke:
                     st.markdown("---")
                     st.markdown("### Analýza rozdelenia")
