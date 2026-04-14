@@ -18,6 +18,7 @@ import altair as alt
 import io
 from ydata_profiling import ProfileReport
 import plotly.io as pio
+from bokeh.models import HoverTool, TapTool, BoxSelectTool
 
 
 def vyber_korelacia(df, xx, yy):
@@ -260,7 +261,11 @@ def generate_chart(kniznica, graf, df, xx, yy, bins=None, sltp=None, zz=None, ro
         fig = figure(width=800, height=400, title=graf)
         
         if graf == "Scatter Plot":
-            fig.scatter(df[xx].values, df[yy].values, size=8, alpha=0.6)
+            r = fig.scatter(df[xx].values, df[yy].values, size=8, alpha=0.6,
+                        selection_color="firebrick", nonselection_alpha=0.2)
+            fig.add_tools(HoverTool(tooltips=[(xx, "$x{0.00}"), (yy, "$y{0.00}")]))
+            fig.add_tools(TapTool())
+            fig.add_tools(BoxSelectTool())
         
         elif graf == "Line Plot":
             df_sorted = df.groupby(xx)[yy].mean().reset_index().sort_values(by=xx)
@@ -275,15 +280,24 @@ def generate_chart(kniznica, graf, df, xx, yy, bins=None, sltp=None, zz=None, ro
                            y_range=(y_min - y_padding, y_max + y_padding))
             
             fig.line(df_sorted[xx].values, df_sorted[yy].values, line_width=2)
+            fig.add_tools(HoverTool(tooltips=[(xx, "$x{0.00}"), (yy, "$y{0.00}")], mode="vline"))
         
         elif graf == "Bar Chart":
             grouped = df.groupby(xx)[yy].mean()
             fig.vbar(x=list(range(len(grouped))), top=grouped.values, width=0.8)
             fig.xaxis.ticker = list(range(len(grouped)))
+            fig.add_tools(HoverTool(tooltips=[(xx, "$x{0.00}"), (yy, "$y{0.00}")], mode="vline"))
 
         elif graf == "Histogram":
             hist, edges = np.histogram(df[xx].dropna(), bins=bins)
             fig.quad(top=hist, bottom=0, left=edges[:-1], right=edges[1:], alpha=0.7)
+            fig.add_tools(HoverTool(
+                tooltips=[
+                    (xx if xx else "Value", "$x{0.00}"),
+                    ("Count", "$y{0.00}")
+                ],
+                mode="vline"
+            ))
         
         fig.xaxis.axis_label = xx if xx else ""
         fig.yaxis.axis_label = yy if yy else ""
@@ -857,20 +871,27 @@ if subor is not None:
                         fig = figure(width=800, height=400, title=graf)
                         
                         if graf == "Scatter Plot":
-                            fig.scatter(df[xx].values, df[yy].values, size=8, alpha=0.6)
+                            r = fig.scatter(df[xx].values, df[yy].values, size=8, alpha=0.6,
+                        selection_color="firebrick", nonselection_alpha=0.2)
+                            fig.add_tools(HoverTool(tooltips=[(xx, "$x{0.00}"), (yy, "$y{0.00}")]))
+                            fig.add_tools(TapTool())
+                            fig.add_tools(BoxSelectTool())
                         
                         elif graf == "Line Plot":
                             df_agg = df.groupby(xx)[yy].mean().reset_index()
                             fig.line(df_agg[xx].values, df_agg[yy].values, line_width=2)
+                            fig.add_tools(HoverTool(tooltips=[(xx, "$x{0.00}"), (yy, "$y{0.00}")], mode="vline"))
                                                 
                         elif graf == "Bar Chart":
                             grouped = df.groupby(xx)[yy].mean()
                             fig.vbar(x=list(range(len(grouped))), top=grouped.values, width=0.8)
                             fig.xaxis.ticker = list(range(len(grouped)))
+                            fig.add_tools(HoverTool(tooltips=[(xx, "$x{0.00}"), (yy, "$y{0.00}")], mode="vline"))
 
                         elif graf == "Histogram":
                             hist, edges = np.histogram(df[xx].dropna(), bins=bins)
                             fig.quad(top=hist, bottom=0, left=edges[:-1], right=edges[1:], alpha=0.7)
+                            fig.add_tools(HoverTool(tooltips=[(xx, "$x{0.00}"), (yy, "$y{0.00}")], mode="vline"))
                         
                         fig.xaxis.axis_label = xx if xx else ""
                         fig.yaxis.axis_label = yy if yy else ""
