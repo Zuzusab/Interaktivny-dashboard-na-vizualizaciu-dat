@@ -8,3 +8,4 @@ scipy
 seaborn
 streamlit
 ydata-profiling
+setuptools<81
