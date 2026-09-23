@@ -2,8 +2,6 @@
 
 Interaktívny nástroj na porovnávanie a analýzu dát naprieč piatimi najpoužívanejšími Python knižnicami na vizualizáciu – navrhnutý pre začínajúcich dátových analytikov a každého, kto rád experimentuje s dátami.
 
-**Python 3.10** · **Licencia: MIT** · **Postavené na Streamlit**
-
 🔗 **[Vyskúšať dashboard](https://interaktivny-dashboard-na-vizualizaciu-dat.streamlit.app/)**
 
 ## O projekte
