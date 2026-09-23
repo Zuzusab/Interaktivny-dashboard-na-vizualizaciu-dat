@@ -49,3 +49,34 @@ Umožňuje priamo porovnať, ako rovnaké dáta vyzerajú naprieč rôznymi kni�
 3. Výber premenných a vygenerovanie grafov vedľa seba na priame porovnanie
 
 <img width="600" alt="Snímka obrazovky 2026-03-23 161133" src="https://github.com/user-attachments/assets/7a69dd12-b351-4ffa-bf9c-8dabc18c94d7" />
+
+## Tech stack
+
+**Framework a UI**
+- [Streamlit](https://streamlit.io/) – webové rozhranie a interaktivita
+
+**Spracovanie dát**
+- pandas, numpy
+
+**Vizualizácia** (5 porovnávaných knižníc)
+- [Matplotlib](https://matplotlib.org/)
+- [Seaborn](https://seaborn.pydata.org/)
+- [Plotly](https://plotly.com/python/)
+- [Bokeh](https://bokeh.org/)
+- [Altair](https://altair-viz.github.io/)
+
+**Štatistická analýza**
+- SciPy – testy normality, korelácie, Cohen's d, porovnanie skupín
+
+**EDA report**
+- [ydata-profiling](https://github.com/ydata-profiling/ydata-profiling) – automatické generovanie exploračnej analýzy dát
+
+Kompletný zoznam závislostí nájdeš v [`requirements.txt`](requirements.txt).
+
+## Výzvy
+
+Najväčšou technickou výzvou bolo zladiť verzie piatich rôznych vizualizačných knižníc tak, aby spolu fungovali bez konfliktov. Každá z nich totiž závisí na iných verziách podporných knižníc, najmä numpy a pandas, ktoré dashboard využíva na spracovanie dát na pozadí. Viacero kombinácií verzií spôsobovalo chyby pri inštalácii alebo priamo počas behu aplikácie, preto som funkčné verzie nakoniec pinovala priamo v `requirements.txt`.
+
+## Licencia
+
+Tento projekt je licencovaný pod MIT licenciou – pozri súbor [LICENSE](LICENSE) pre detaily.
