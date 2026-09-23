@@ -8,7 +8,7 @@ Interaktívny nástroj na porovnávanie a analýzu dát naprieč piatimi najpou�
 
 ## O projekte
 
-Dashboard vznikol v rámci mojej bakalárskej práce, ktorá sa venovala porovnávaniu vizualizačných knižníc v Pythone. Namiesto teoretického porovnania som chcela vytvoriť nástroj, ktorý umožní priamo si vyskúšať a vizuálne porovnať, ako rovnaké dáta vyzerajú naprieč piatimi najpoužívanejšími knižnicami. Zároveň poskytuje aj základnú štatistickú analýzu, aby bol užitočný nielen na porovnávanie knižníc, ale aj na reálnu prácu s dátami.
+Dashboard vznikol v rámci mojej bakalárskej práce, ktorá sa venovala porovnávaniu vizualizačných knižníc v Pythone. Namiesto teoretického porovnania som chcela vytvoriť nástroj, ktorý umožní priamo si vyskúšať a vizuálne porovnať, ako rovnaké dáta vyzerajú naprieč piatimi najpoužívanejšími knižnicami. Dashboard zároveň poskytuje aj základnú štatistickú analýzu, aby bol užitočný nielen na porovnávanie knižníc, ale aj na reálnu prácu s dátami.
 
 <img width="800" alt="Snímka obrazovky 2026-04-30 151838" src="https://github.com/user-attachments/assets/83826371-52da-4f4d-99dd-36fc95cfdace" />
 
