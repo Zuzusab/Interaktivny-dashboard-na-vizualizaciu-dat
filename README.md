@@ -10,7 +10,8 @@ Interaktívny nástroj na porovnávanie a analýzu dát naprieč piatimi najpou�
 
 Dashboard vznikol v rámci mojej bakalárskej práce, ktorá sa venovala porovnávaniu vizualizačných knižníc v Pythone. Namiesto teoretického porovnania som chcela vytvoriť nástroj, ktorý umožní priamo si vyskúšať a vizuálne porovnať, ako rovnaké dáta vyzerajú naprieč piatimi najpoužívanejšími knižnicami. Zároveň poskytuje aj základnú štatistickú analýzu, aby bol užitočný nielen na porovnávanie knižníc, ale aj na reálnu prácu s dátami.
 
-<img width="1664" height="1574" alt="Snímka obrazovky 2026-04-30 151838" src="https://github.com/user-attachments/assets/83826371-52da-4f4d-99dd-36fc95cfdace" />
+<img width="800" alt="Snímka obrazovky 2026-04-30 151838" src="https://github.com/user-attachments/assets/83826371-52da-4f4d-99dd-36fc95cfdace" />
+
 ## Kľúčové funkcie
 
 ### Automatický profil datasetu
@@ -39,7 +40,7 @@ Grafy sú doplnené o štatistickú analýzu (len tam, kde to dáva zmysel vzhľ
 Grafy je možné exportovať podľa možností, ktoré daná knižnica podporuje.
 
 
-<img width="1358" height="981" alt="Snímka obrazovky 2026-04-30 153052" src="https://github.com/user-attachments/assets/db51e310-cce3-4ced-a87b-14889d66a8cb" />
+<img width="800" alt="Snímka obrazovky 2026-04-30 153052" src="https://github.com/user-attachments/assets/db51e310-cce3-4ced-a87b-14889d66a8cb" />
 
 ###  Porovnávací režim
 Umožňuje priamo porovnať, ako rovnaké dáta vyzerajú naprieč rôznymi knižnicami:
@@ -47,4 +48,4 @@ Umožňuje priamo porovnať, ako rovnaké dáta vyzerajú naprieč rôznymi kni�
 2. Dashboard automaticky ponúkne len typy grafov, ktoré sú spoločné pre všetky vybrané knižnice
 3. Výber premenných a vygenerovanie grafov vedľa seba na priame porovnanie
 
-<img width="2745" height="1542" alt="Snímka obrazovky 2026-03-23 161133" src="https://github.com/user-attachments/assets/7a69dd12-b351-4ffa-bf9c-8dabc18c94d7" />
+<img width="800" alt="Snímka obrazovky 2026-03-23 161133" src="https://github.com/user-attachments/assets/7a69dd12-b351-4ffa-bf9c-8dabc18c94d7" />
