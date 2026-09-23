@@ -29,7 +29,7 @@ Vhodný na prácu s jednou knižnicou:
 2. Výber premenných na vizualizáciu
 3. Vygenerovanie grafu na kliknutie
 
-<img width="1362" height="1489" alt="Snímka obrazovky 2026-04-30 153021" src="https://github.com/user-attachments/assets/c67d089a-a5db-43f0-90fb-da262f260858" />
+<img width="600" alt="Snímka obrazovky 2026-04-30 153021" src="https://github.com/user-attachments/assets/c67d089a-a5db-43f0-90fb-da262f260858" />
 
 Grafy sú doplnené o štatistickú analýzu (len tam, kde to dáva zmysel vzhľadom na typ grafu):
 - Test normality
@@ -40,7 +40,7 @@ Grafy sú doplnené o štatistickú analýzu (len tam, kde to dáva zmysel vzhľ
 Grafy je možné exportovať podľa možností, ktoré daná knižnica podporuje.
 
 
-<img width="800" alt="Snímka obrazovky 2026-04-30 153052" src="https://github.com/user-attachments/assets/db51e310-cce3-4ced-a87b-14889d66a8cb" />
+<img width="600" alt="Snímka obrazovky 2026-04-30 153052" src="https://github.com/user-attachments/assets/db51e310-cce3-4ced-a87b-14889d66a8cb" />
 
 ###  Porovnávací režim
 Umožňuje priamo porovnať, ako rovnaké dáta vyzerajú naprieč rôznymi knižnicami:
@@ -48,4 +48,4 @@ Umožňuje priamo porovnať, ako rovnaké dáta vyzerajú naprieč rôznymi kni�
 2. Dashboard automaticky ponúkne len typy grafov, ktoré sú spoločné pre všetky vybrané knižnice
 3. Výber premenných a vygenerovanie grafov vedľa seba na priame porovnanie
 
-<img width="800" alt="Snímka obrazovky 2026-03-23 161133" src="https://github.com/user-attachments/assets/7a69dd12-b351-4ffa-bf9c-8dabc18c94d7" />
+<img width="600" alt="Snímka obrazovky 2026-03-23 161133" src="https://github.com/user-attachments/assets/7a69dd12-b351-4ffa-bf9c-8dabc18c94d7" />
